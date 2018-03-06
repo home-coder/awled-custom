@@ -1,0 +1,2 @@
+# awled-custom
+aw9817+aw9818两块i2c芯片组合成36路RGB灯，详细效果定义见README.md，包含kernel驱动和userspace上的场景接口代码
