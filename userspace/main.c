@@ -73,6 +73,7 @@ static void application_main_loop(void)
 		application_handle_cmd(cmd);
 	}
 
+	//TODO some test case ...
 }
 
 int main()
