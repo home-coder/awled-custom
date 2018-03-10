@@ -3,11 +3,7 @@
 
 #include "Application_LED.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
-// led effect function
+//TODO 自定义效果 led effect function
 typedef enum{
 	LEDS_EFFECT_NONE,
 	LEDS_EFFECT_INCREASE,
@@ -35,10 +31,5 @@ extern void application_set_led_cur_state(APP_LED_EFFECT_ENUM cur_state);
 extern APP_LED_EFFECT_ENUM application_led_effect_random(void);
 extern void application_led_effect_init(BYTE chip_index);
 extern void application_led_effect_interrupt_handle(BYTE chip_index);
-
-
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif  /* __APPLICATION_LED_EFFECT_H__ */

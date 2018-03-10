@@ -16,7 +16,7 @@ typedef enum {
 	LED_CMD_EFFECT_INIT,
 	LED_CMD_EFFECT_INT_HANDLE,
 	LED_CMD_TOTAL,
-}MAIN_CMD_ENUM;
+} MAIN_CMD_ENUM;
 
 static void application_led_buffer_init(void)
 {
@@ -44,25 +44,31 @@ static void application_main_init(void)
 	application_led_buffer_init();
 }
 
+static void application_main_uninit(void)
+{
+	application_led_buffer_uninit();
+}
+
 static void application_handle_cmd(MAIN_CMD_ENUM cmd)
 {
+	//TODO some test case effect
 	switch (cmd) {
-		case LED_CMD_POWER_ON:
-			break;
-		case LED_CMD_CHIPID_CHECK:
-			led_check_chip_id(0);
-			break;
-		case LED_CMD_REG_INIT:
-			led_regs_init(0);
-			break;
-		case LED_CMD_EFFECT_INIT:
-			application_led_effect_init(0);
-			break;
-		case LED_CMD_EFFECT_INT_HANDLE:
-			application_led_effect_interrupt_handle(0);
-			break;
-		default:
-			break;
+	case LED_CMD_POWER_ON:
+		break;
+	case LED_CMD_CHIPID_CHECK:
+		led_check_chip_id(0);
+		break;
+	case LED_CMD_REG_INIT:
+		led_regs_init(0);
+		break;
+	case LED_CMD_EFFECT_INIT:
+		application_led_effect_init(0);
+		break;
+	case LED_CMD_EFFECT_INT_HANDLE:
+		application_led_effect_interrupt_handle(0);
+		break;
+	default:
+		break;
 	}
 
 }
@@ -83,6 +89,8 @@ int main()
 {
 	application_main_init();
 	application_main_loop();
+
+	application_main_uninit();
 
 	return 0;
 }
