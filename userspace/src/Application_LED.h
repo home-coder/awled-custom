@@ -19,6 +19,7 @@ typedef struct{
 #define EVENT_ID_AWCHIP_REG_READ_8BIT 0x01
 #define EVENT_ID_AWCHIP_REG_WRITE_8BIT 0x02
 
+
 typedef struct{
 	BYTE reg_data_base;
 	BYTE reg_data_end;
@@ -72,6 +73,7 @@ typedef struct{
 typedef enum{
 	AW_MCU_COMMU_BEGIN,
 	AW_MCU_COMMU_NONE = AW_MCU_COMMU_BEGIN,
+	AW_MCU_I2C_0,
 	AW_MCU_I2C_1,
 	AW_MCU_I2C_2,
 	AW_MCU_COMMU_MAX
