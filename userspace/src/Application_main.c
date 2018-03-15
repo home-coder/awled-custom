@@ -85,6 +85,10 @@ static void application_main_loop(void)
 	//TODO some test case ...
 }
 
+/*
+   TODO 重新整理思路，做成一个底层服务，用于监听和处理各处的事件
+ 
+ */
 int main()
 {
 	application_main_init();
