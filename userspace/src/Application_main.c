@@ -41,7 +41,6 @@ static void application_main_uninit(void)
 
 static void application_handle_cmd(MAIN_CMD_ENUM cmd)
 {
-	//TODO some test case effect
 	switch (cmd) {
 	case LED_CMD_POWER_ON:
 		break;

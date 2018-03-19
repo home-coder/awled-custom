@@ -88,6 +88,24 @@ APP_LED_EFFECT_ENUM application_led_effect_random(void)
 	return led_effect;
 }
 
+static void application_allchips_set_all_same_bright_level(int8 brightness, BOOL update_led)
+{
+	BYTE chip_index;
+
+	for (chip_index = 0; chip_index < led_get_chips_number(); chip_index++) {
+		application_set_all_same_bright_level(chip_index, brightness, update_led);
+	}
+}
+
+static void application_allchips_set_all_same_color(APP_COLOR_STRUCT *color, update_led)
+{
+	BYTE chip_index;
+
+	for (chip_index = 0; chip_index < led_get_chips_number(); chip_index++) {
+		application_set_all_same_color(chip_index, color, TRUE);
+	}
+}
+
 // when we change the effection, we should clear all leds firstly
 static void application_led_close_all(BYTE chip_index)
 {
@@ -96,6 +114,15 @@ static void application_led_close_all(BYTE chip_index)
 	// clear all bright level and color data
 	application_set_all_same_bright_level(chip_index, 0, FALSE);
 	application_set_all_same_color(chip_index, &color, TRUE);
+}
+
+static void application_allchips_led_close_all()
+{
+	BYTE chip_index;
+
+	for (chip_index = 0; chip_index < led_get_chips_number(); chip_index++) {
+		application_led_close_all(chip_index);
+	}
 }
 
 void application_led_effect_init(BYTE chip_index)
@@ -476,7 +503,14 @@ void application_led_effect_bootm_complete()
  */
 void application_led_effect_airkiss_mode()
 {
+	APP_COLOR_STRUCT color = {APP_COLOR_FULL, APP_COLOR_HALF, APP_COLOR_NONE};
+	BYTE max_bright_level = application_get_max_bright_level();
+	int8 brightness = application_get_brightness_by_level(max_bright_level);
 
+	// set all bright level and color data
+
+	application_allchips_set_all_same_bright_level(brightness, FALSE);
+	application_allchips_set_all_same_color(&color, TRUE);
 }
 
 /*
@@ -485,6 +519,7 @@ void application_led_effect_airkiss_mode()
 void application_led_effect_airkiss_config()
 {
 
+
 }
 
 /*
@@ -492,7 +527,7 @@ void application_led_effect_airkiss_config()
  */
 void application_led_effect_airkiss_connect()
 {
-
+	application_allchips_led_close_all();
 }
 
 /*
