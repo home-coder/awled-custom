@@ -10,38 +10,28 @@
 typedef enum {
 	LED_CMD_POWER_ON,
 	LED_CMD_CHIPID_CHECK,
-	LED_CMD_REG_INIT,
-	//  LED_CMD_REG_READ,
-
-	LED_CMD_EFFECT_INIT,
 	LED_CMD_EFFECT_INT_HANDLE,
 	LED_CMD_TOTAL,
 } MAIN_CMD_ENUM;
 
-static void application_led_buffer_init(void)
+static void application_led_buffer_uninit(void)
+{
+	//TODO  free buffers
+}
+
+static void application_main_init(void)
 {
 	// Initialize buffer for writing chip registers
 	led_init_regs_buffer();
 
 	// Initialize buffer for leds effect
 	application_init_leds_info();
-}
 
-static void application_led_buffer_uninit(void)
-{
-	// free buffers
-	led_uninit_regs_buffer();
-
-	application_uninit_leds_info();
-}
-
-static void application_main_init(void)
-{
-	// Initialize device hardware configure, eg: I2C configure 7bit
-	//TODO application_device_init();
-
-	// Initialize buffer for led registers refresh and effect
-	application_led_buffer_init();
+	// Initialize all chips config and first effect
+	for (i = 0; i < led_get_chips_number(); i++) {
+		led_regs_init(i);
+		application_led_effect_init(i);
+	}
 }
 
 static void application_main_uninit(void)
@@ -58,14 +48,8 @@ static void application_handle_cmd(MAIN_CMD_ENUM cmd)
 	case LED_CMD_CHIPID_CHECK:
 		led_check_chip_id(0);
 		break;
-	case LED_CMD_REG_INIT:
-		led_regs_init(0);
-		break;
-	case LED_CMD_EFFECT_INIT:
-		application_led_effect_init(0);
-		break;
 	case LED_CMD_EFFECT_INT_HANDLE:
-		application_led_effect_interrupt_handle(0);
+		application_led_effect_interrupt_handle();
 		break;
 	default:
 		break;
@@ -83,6 +67,11 @@ static void application_main_loop(void)
 	}
 
 	//TODO some test case ...
+	while (1) {
+		//effect->state
+
+		application_handle_cmd(LED_CMD_EFFECT_INT_HANDLE);
+	}
 }
 
 /*

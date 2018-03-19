@@ -453,7 +453,73 @@ static void application_led_effect_color_breath(BYTE chip_index)
 	}
 }
 
-void application_led_effect_interrupt_handle(BYTE chip_index)
+/*
+ 一圈浅蓝色的灯亮起，
+ 浅红色的灯以 彗星 模式转动
+ */
+void application_led_effect_bootm_startup()
+{
+
+}
+
+/*
+ 一圈白色的灯亮起，
+ 浅蓝色的灯以 彗星 模式转动
+ */
+void application_led_effect_bootm_complete()
+{
+
+}
+
+/*
+ 一圈橙色的灯亮起
+ */
+void application_led_effect_airkiss_mode()
+{
+
+}
+
+/*
+ 浅黄色的灯以 彗星 模式转动
+ */
+void application_led_effect_airkiss_config()
+{
+
+}
+
+/*
+ 联网成功后，所有灯都熄灭
+ */
+void application_led_effect_airkiss_connect()
+{
+
+}
+
+/*
+ 一圈蓝色灯亮起，发声方向处变为白色
+ */
+void application_led_effect_wake_up()
+{
+
+}
+
+/*
+ 一圈蓝色灯闪烁一下后，全部熄灭
+ */
+void application_led_effect_command_fail()
+{
+
+}
+
+/*
+ 一圈灯由蓝色和浅蓝色交替变换
+ */
+void application_led_effect_command_success()
+{
+
+}
+
+void application_led_effect_interrupt_handle()
 {
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
 

@@ -54,9 +54,9 @@ static const AW_LED_STRUCT led_aw9818_regs_map[] = {
 };
 
 const AWCHIP_LEDS_HW_STRUCT led_hw_info[APPLI_LED_CHIPS_NUM] = {
-	//TODO 9817
+	//TODO 9818
 	{
-	 AW9817,
+	 AW9818_0,
 	 18,
 	 {AW_MCU_I2C_1, 0x3A},
 	 // base data register is 0x10 in AW981x
@@ -66,7 +66,7 @@ const AWCHIP_LEDS_HW_STRUCT led_hw_info[APPLI_LED_CHIPS_NUM] = {
 	 },
 	//TODO 9818
 	{
-	 AW9818,
+	 AW9818_1,
 	 18,
 	 {AW_MCU_I2C_1, 0x3A},
 	 // base data register is 0x10 in AW981x
