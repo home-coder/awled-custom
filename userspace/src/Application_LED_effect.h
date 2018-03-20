@@ -5,14 +5,15 @@
 
 typedef enum{
 	LEDS_EFFECT_NONE,
-	LEDS_EFFECT_BOOTM_STARTUP,					/*board power on*/
-	LEDS_EFFECT_BOOTM_COMPLETE,					/*board startup over*/
-	LEDS_EFFECT_BOOTM_AIRKISS_MODE,				/*in airkiss mode*/
-	LEDS_EFFECT_BOOTM_AIRKISS_CONFIG,			/*config airkiss*/
-	LEDS_EFFECT_BOOTM_AIRKISS_CONNECT,			/*airkiss connected*/
-	LEDS_EFFECT_BOOTM_WAKE_UP,					/*voice wake up*/
-	LEDS_EFFECT_BOOTM_COMMAND_FAIL,				/*voice command failed*/
-	LEDS_EFFECT_BOOTM_COMMAND_SUCCESS,			/*voice command success*/
+	LEDS_EFFECT_STARTUP,					/*board power on*/
+	LEDS_EFFECT_COMPLETE,					/*board startup over*/
+	LEDS_EFFECT_AIRKISS_MODE,				/*in airkiss mode*/
+	LEDS_EFFECT_AIRKISS_CONFIG,				/*config airkiss*/
+	LEDS_EFFECT_AIRKISS_CONNECT,			/*airkiss connected*/
+	LEDS_EFFECT_WAKE_UP,					/*voice wake up*/
+	LEDS_EFFECT_COMMAND_FAIL,				/*voice command failed*/
+	LEDS_EFFECT_COMMAND_SUCCESS,			/*voice command success*/
+	LEDS_EFFECT_KEYMUTE,					/*key mute record*/
 	LEDS_EFFECT_INCREASE,
 	LEDS_EFFECT_DECREASE,
 	LEDS_EFFECT_BRIGHT_CHANGE,

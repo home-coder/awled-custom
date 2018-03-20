@@ -3,6 +3,8 @@
 
 #include "Application_main_option.h"
 
+#define msleep(x) usleep(x*1000)
+
 typedef struct{
 	BYTE r;
 	BYTE g;
