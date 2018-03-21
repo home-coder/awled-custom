@@ -34,7 +34,7 @@ static const BYTE *r16_i2c_node[] = {
 
 static R16_I2c_HANDLER **r16_i2c_handler = NULL;
 
-static R16_I2c_HANDLER* r16_i2c_get_handler_by_index(BYTE i2c_index)
+static R16_I2c_HANDLER *r16_i2c_get_handler_by_index(BYTE i2c_index)
 {
 	R16_I2c_HANDLER *p_handler = NULL;
 	R16_I2c_HANDLER **p_temp = r16_i2c_handler;
@@ -49,7 +49,7 @@ static R16_I2c_HANDLER* r16_i2c_get_handler_by_index(BYTE i2c_index)
 	return NULL;
 }
 
-static void r16_i2c_set_handler_buf(R16_I2c_HANDLER **pp_r16_i2c_handler)
+static void r16_i2c_set_handler_buf(R16_I2c_HANDLER ** pp_r16_i2c_handler)
 {
 	if (NULL != pp_r16_i2c_handler) {
 		r16_i2c_handler = pp_r16_i2c_handler;
@@ -59,7 +59,7 @@ static void r16_i2c_set_handler_buf(R16_I2c_HANDLER **pp_r16_i2c_handler)
 /*
 	eg: reg[0x0, 0x01, 0x02, ...] to set data[0x12, 0x33, 0x42, ...]
  */
-void r16_i2c_writeregisters(BYTE mode, AWCHIP_REGS_ACCESS_STRUCT *reg_access_data, BYTE *p_value )
+void r16_i2c_writeregisters(BYTE mode, AWCHIP_REGS_ACCESS_STRUCT * reg_access_data, BYTE * p_value)
 {
 	int fd = -1, i;
 	BYTE retry = 2, ret = -1;
@@ -68,7 +68,7 @@ void r16_i2c_writeregisters(BYTE mode, AWCHIP_REGS_ACCESS_STRUCT *reg_access_dat
 
 	if (NULL == reg_access_data) {
 		printf("reg_access_data is NULL\n");
-		return ;
+		return;
 	}
 
 	dcommu = reg_access_data->device_commu;
@@ -84,25 +84,25 @@ void r16_i2c_writeregisters(BYTE mode, AWCHIP_REGS_ACCESS_STRUCT *reg_access_dat
 		(p_i2c_handler->i2c_data.msgs[0]).len = 1;
 		(p_i2c_handler->i2c_data.msgs[0]).flags = 0;
 		switch (mode) {
-			case EVENT_ID_AWCHIP_REG_READ_8BIT:
-				for (i = 0; i < reg_num; i++) {
-					while (retry > 0) {
-						(p_i2c_handler->i2c_data.msgs[0]).buf[0] = base_reg + i;
-						(p_i2c_handler->i2c_data.msgs[0]).buf[1] = *(p_value + i);
-						ret = ioctl(fd, I2C_RDWR, (unsigned long)p_i2c_handler);
-						if (ret < 0) {
-							perror("ioctl write time error");
-							retry--;
-							continue;
-						}
-						break;
+		case EVENT_ID_AWCHIP_REG_READ_8BIT:
+			for (i = 0; i < reg_num; i++) {
+				while (retry > 0) {
+					(p_i2c_handler->i2c_data.msgs[0]).buf[0] = base_reg + i;
+					(p_i2c_handler->i2c_data.msgs[0]).buf[1] = *(p_value + i);
+					ret = ioctl(fd, I2C_RDWR, (unsigned long)p_i2c_handler);
+					if (ret < 0) {
+						perror("ioctl write time error");
+						retry--;
+						continue;
 					}
+					break;
 				}
-				break;
-				//EVENT_ID_AWCHIP_REG_READ_16BIT:
-				//unuse
-			default:
-				break;
+			}
+			break;
+			//EVENT_ID_AWCHIP_REG_READ_16BIT:
+			//unuse
+		default:
+			break;
 		}
 
 		free((p_i2c_handler->i2c_data.msgs[0]).buf);
@@ -115,8 +115,8 @@ void r16_i2c_init()
 	int i;
 	R16_I2c_HANDLER **pp_r16_i2c_handler = NULL;
 
-	for (i = 0; i < sizeof(r16_i2c_node)/sizeof(r16_i2c_node[0]); i++) {
-		pp_r16_i2c_handler[i] = (R16_I2c_HANDLER *)malloc(sizeof(R16_I2c_HANDLER*));
+	for (i = 0; i < sizeof(r16_i2c_node) / sizeof(r16_i2c_node[0]); i++) {
+		pp_r16_i2c_handler[i] = (R16_I2c_HANDLER *) malloc(sizeof(R16_I2c_HANDLER *));
 		if (NULL != pp_r16_i2c_handler[i]) {
 			pp_r16_i2c_handler[i]->fd = open(r16_i2c_node[i], O_RDWR);
 			if (-1 == pp_r16_i2c_handler[i]->fd) {

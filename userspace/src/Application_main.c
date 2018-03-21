@@ -6,6 +6,7 @@
  ************************************************************************/
 
 #include <stdio.h>
+#include "Application_LED_effect.h"
 
 typedef enum {
 	LED_CMD_POWER_ON,
@@ -28,6 +29,7 @@ static void application_main_init(void)
 	application_init_leds_info();
 
 	// Initialize all chips config and first effect
+	int i;
 	for (i = 0; i < led_get_chips_number(); i++) {
 		led_regs_init(i);
 		application_led_effect_init(i);
@@ -66,11 +68,10 @@ static void application_main_loop(void)
 	}
 
 	//TODO some test case ...
-	while (1) {
-		//effect->state
+	//effect->state
+	application_set_led_cur_state(LEDS_EFFECT_IMAX_CHANGE);
 
-		application_handle_cmd(LED_CMD_EFFECT_INT_HANDLE);
-	}
+	application_handle_cmd(LED_CMD_EFFECT_INT_HANDLE);
 }
 
 /*

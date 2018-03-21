@@ -2,6 +2,7 @@
 #include "Application_LED_effect.h"
 
 //#include <stdlib.h> 
+#include <stdio.h>
 #include "Chip_AW981x.h"
 
 static const APP_COLOR_STRUCT breath_colors[] = {
@@ -88,16 +89,16 @@ APP_LED_EFFECT_ENUM application_led_effect_random(void)
 	return led_effect;
 }
 
-static void application_allchips_set_all_same_bright_level(int8 brightness, BOOL update_led)
+static void application_allchips_set_all_same_bright_level(int8 bright_level, BOOL update_led)
 {
 	BYTE chip_index;
 
 	for (chip_index = 0; chip_index < led_get_chips_number(); chip_index++) {
-		application_set_all_same_bright_level(chip_index, brightness, update_led);
+		application_set_all_same_bright_level(chip_index, bright_level, update_led);
 	}
 }
 
-static void application_allchips_set_all_same_color(APP_COLOR_STRUCT *color, update_led)
+static void application_allchips_set_all_same_color(APP_COLOR_STRUCT * color, BOOL update_led)
 {
 	BYTE chip_index;
 
@@ -238,6 +239,15 @@ static void application_led_effect_change_bright(BYTE chip_index)
 	}
 }
 
+static void application_allchips_led_effect_change_bright()
+{
+	BYTE chip_index;
+
+	for (chip_index = 0; chip_index < led_get_chips_number(); chip_index++) {
+		application_led_effect_change_bright(chip_index);
+	}
+}
+
 static void application_led_effect_change_color(BYTE chip_index)
 {
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
@@ -262,6 +272,15 @@ static void application_led_effect_change_color(BYTE chip_index)
 	}
 }
 
+static void application_allchips_led_effect_change_color()
+{
+	BYTE chip_index;
+
+	for (chip_index = 0; chip_index < led_get_chips_number(); chip_index++) {
+		application_led_effect_change_color(chip_index);
+	}
+}
+
 static void application_led_effect_change_iMax(BYTE chip_index)
 {
 	BYTE iMax_nums = sizeof(chip_iMax) / sizeof(BYTE);
@@ -270,6 +289,16 @@ static void application_led_effect_change_iMax(BYTE chip_index)
 	application_iMax %= iMax_nums;
 
 	led_chip_change_imax(chip_index, chip_iMax[application_iMax]);
+}
+
+static void application_allchips_led_effect_change_iMax()
+{
+	BYTE chip_index;
+
+	for (chip_index = 0; chip_index < led_get_chips_number(); chip_index++) {
+		application_led_effect_change_iMax(chip_index);
+		application_led_effect_update(chip_index);
+	}
 }
 
 // led move with the same color
@@ -376,7 +405,7 @@ static void application_led_effect_light_up(BYTE chip_index, BYTE brightness, co
 	}
 }
 
-static void application_led_effect_breath(BYTE chip_index)
+static void application_led_effect_breath()
 {
 	BYTE color_idx = 0;
 	BYTE brightness = 0;
@@ -385,6 +414,7 @@ static void application_led_effect_breath(BYTE chip_index)
 	WORD refresh_nums = 0;
 	const APP_COLOR_STRUCT *p_color = NULL;
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
+	BYTE chip_index;
 
 	if (NULL != p_led_effect) {
 		refresh_nums = application_get_refresh_nums();
@@ -403,7 +433,9 @@ static void application_led_effect_breath(BYTE chip_index)
 		}
 
 		// light up leds
-		application_led_effect_light_up(chip_index, brightness, p_color);
+		for (chip_index = 0; chip_index < led_get_chips_number(); chip_index++) {
+			application_led_effect_light_up(chip_index, brightness, p_color);
+		}
 
 		refresh_nums++;
 		if (refresh_nums > 1) {
@@ -500,54 +532,63 @@ static void application_led_effect_color_breath(BYTE chip_index)
 	}
 }
 
-/*
- 一圈浅蓝色的灯亮起，
- 浅红色的灯以 彗星 模式转动
- */
-void application_led_effect_bootm_startup()
+static void application_led_effect_comet(APP_COLOR_STRUCT background, APP_COLOR_STRUCT forward)
 {
-	APP_COLOR_STRUCT yellow = {APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_NONE};
-	APP_COLOR_STRUCT black  = {APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_NONE};
 	APP_LEDS_MOVE_DIR dir = LEDS_MOVE_CW;
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
-	WORD start = 0;
+	WORD start = 0, end;
 	BYTE len = application_get_max_bright_level();
-	BYTE led_nums = 0;
+	BYTE led_nums = 0, half_pos;	//half[0-17] [18-35]
+	BYTE i;
+	BYTE brightness;
 
 	if (NULL == p_led_effect) {
 		printf("p_led_effect is not exsit\n");
-		return ;
+		return;
 	}
-
 	//start = p_led_effect->cur_idx; 
 	start = 0;
 	led_nums = application_allchips_get_max_leds();
 	half_pos = led_nums / 2;
 	while (p_led_effect->last_state == p_led_effect->cur_state) {
-		if (led_nums>0 && start<led_nums && len<led_nums) {
-			application_set_all_same_color(&black, TRUE);	
+		if (led_nums > 0 && start < led_nums && len < led_nums) {
+			application_allchips_set_all_same_bright_level(len, FALSE);	//len = max_bright_level
+			application_allchips_set_all_same_color(&background, TRUE);
 
-			//set bright increase. set color yellow
+			//set bright comet. set color yellow
 			for (i = 0; i < len; i++) {
 				if (LEDS_MOVE_CW == dir) {
-					end = (start+i) % led_nums;
+					end = (start + i) % led_nums;
 				}
-				brightness = application_get_max_bright_level(i);
+				brightness = application_get_brightness_by_level(i);
 				if (end < half_pos) {
-					application_set_led_brightness(0, end, brightness, FALSE);	
-					application_set_led_color(0, end, &yellow, TRUE);
+					application_set_led_brightness(0, end, brightness, FALSE);
+					application_set_led_color(0, end, &forward, TRUE);
 				} else {
 					application_set_led_brightness(1, end % half_pos, brightness, FALSE);
-					application_set_led_color(1, end, &yellow, TRUE);
+					application_set_led_color(1, end, &forward, TRUE);
 				}
 			}
 		}
 		application_allchips_led_effect_update();
 		//sleep
 		msleep(300);
-		start++ %= led_nums;
+		start++;
+		start %= led_nums;
 	}
 
+}
+
+/*
+ 一圈浅蓝色的灯亮起，
+ 浅红色的灯以 彗星 模式转动
+ */
+void application_led_effect_bootm_startup()
+{
+	APP_COLOR_STRUCT red = { APP_COLOR_FULL, APP_COLOR_NONE, APP_COLOR_NONE };
+	APP_COLOR_STRUCT blue = { APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_FULL };
+
+	application_led_effect_comet(blue, red);
 }
 
 /*
@@ -556,48 +597,10 @@ void application_led_effect_bootm_startup()
  */
 void application_led_effect_bootm_complete()
 {
-	APP_COLOR_STRUCT yellow = {APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_NONE};
-	APP_COLOR_STRUCT white  = {APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_FULL};
-	APP_LEDS_MOVE_DIR dir = LEDS_MOVE_CW;
-	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
-	WORD start = 0;
-	BYTE len = application_get_max_bright_level();
-	BYTE led_nums = 0;
+	APP_COLOR_STRUCT yellow = { APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_NONE };
+	APP_COLOR_STRUCT white = { APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_FULL };
 
-	if (NULL == p_led_effect) {
-		printf("p_led_effect is not exsit\n");
-		return ;
-	}
-
-	//start = p_led_effect->cur_idx;
-	start = 0;
-	led_nums = application_allchips_get_max_leds();
-	half_pos = led_nums / 2;
-	while (p_led_effect->last_state == p_led_effect->cur_state) {
-		if (led_nums>0 && start<led_nums && len<led_nums) {
-			application_set_all_same_color(&white, TRUE);
-
-			//set bright increase. set color yellow
-			for (i = 0; i < len; i++) {
-				if (LEDS_MOVE_CW == dir) {
-					end = (start+i) % led_nums;
-				}
-				brightness = application_get_max_bright_level(i);
-				if (end < half_pos) {
-					application_set_led_brightness(0, end, brightness, FALSE);
-					application_set_led_color(0, end, &yellow, TRUE);
-				} else {
-					application_set_led_brightness(1, end % half_pos, brightness, FALSE);
-					application_set_led_color(1, end, &yellow, TRUE);
-				}
-			}
-		}
-		application_allchips_led_effect_update();
-		//sleep
-		msleep(300);
-		start++ %= led_nums;
-	}
-
+	application_led_effect_comet(yellow, white);
 }
 
 /*
@@ -605,13 +608,12 @@ void application_led_effect_bootm_complete()
  */
 void application_led_effect_airkiss_mode()
 {
-	APP_COLOR_STRUCT color = {APP_COLOR_FULL, APP_COLOR_HALF, APP_COLOR_NONE};
+	APP_COLOR_STRUCT color = { APP_COLOR_FULL, APP_COLOR_HALF, APP_COLOR_NONE };
 	BYTE max_bright_level = application_get_max_bright_level();
-	int8 brightness = application_get_brightness_by_level(max_bright_level);
 
 	// set all bright level and color data
 
-	application_allchips_set_all_same_bright_level(brightness, FALSE);
+	application_allchips_set_all_same_bright_level(max_bright_level, FALSE);
 	application_allchips_set_all_same_color(&color, TRUE);
 
 	application_allchips_led_effect_update();
@@ -622,47 +624,10 @@ void application_led_effect_airkiss_mode()
  */
 void application_led_effect_airkiss_config()
 {
-	APP_COLOR_STRUCT yellow = {APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_NONE};
-	APP_COLOR_STRUCT black  = {APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_NONE};
-	APP_LEDS_MOVE_DIR dir = LEDS_MOVE_CW;
-	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
-	WORD start = 0;
-	BYTE len = application_get_max_bright_level();
-	BYTE led_nums = 0;
+	APP_COLOR_STRUCT yellow = { APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_NONE };
+	APP_COLOR_STRUCT black = { APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_NONE };
 
-	if (NULL == p_led_effect) {
-		printf("p_led_effect is not exsit\n");
-		return ;
-	}
-
-	//start = p_led_effect->cur_idx; 
-	start = 0;
-	led_nums = application_allchips_get_max_leds();
-	half_pos = led_nums / 2;
-	while (p_led_effect->last_state == p_led_effect->cur_state) {
-		if (led_nums>0 && start<led_nums && len<led_nums) {
-			application_set_all_same_color(&black, TRUE);	
-
-			//set bright increase. set color yellow
-			for (i = 0; i < len; i++) {
-				if (LEDS_MOVE_CW == dir) {
-					end = (start+i) % led_nums;
-				}
-				brightness = application_get_max_bright_level(i);
-				if (end < half_pos) {
-					application_set_led_brightness(0, end, brightness, FALSE);	
-					application_set_led_color(0, end, &yellow, TRUE);
-				} else {
-					application_set_led_brightness(1, end % half_pos, brightness, FALSE);
-					application_set_led_color(1, end, &yellow, TRUE);
-				}
-			}
-		}
-		application_allchips_led_effect_update();
-		//sleep
-		msleep(300);
-		start++ %= led_nums;
-	}
+	application_led_effect_comet(yellow, black);
 }
 
 /*
@@ -688,13 +653,12 @@ void application_led_effect_wake_up()
  */
 void application_led_effect_command_fail()
 {
-	APP_COLOR_STRUCT blue = {APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_FULL};
+	APP_COLOR_STRUCT blue = { APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_FULL };
 	BYTE max_bright_level = application_get_max_bright_level();
-	int8 brightness = application_get_brightness_by_level(max_bright_level);
 
 	// set all bright level and color data
 
-	application_allchips_set_all_same_bright_level(brightness, FALSE);
+	application_allchips_set_all_same_bright_level(max_bright_level, FALSE);
 	application_allchips_set_all_same_color(&blue, TRUE);
 
 	application_allchips_led_effect_update();
@@ -706,26 +670,30 @@ void application_led_effect_command_fail()
 }
 
 /*
- 一圈灯由蓝色和浅蓝色交替变换
+ 一圈灯由蓝色和浅蓝色交替变换 5s
  */
 void application_led_effect_command_success()
 {
 	//breath
+	APP_COLOR_STRUCT blue = { APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_FULL };
+	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
 
+	while (p_led_effect->last_state != p_led_effect->cur_state) {
+		application_led_effect_breath();
+	}
 }
 
 /*
- 一圈灯变成红色
+ 一圈灯变成红色(mute), 无色(unmute)
  */
 void application_led_effect_keymute()
 {
-	APP_COLOR_STRUCT red = {APP_COLOR_FULL, APP_COLOR_NONE, APP_COLOR_NONE};
+	APP_COLOR_STRUCT red = { APP_COLOR_FULL, APP_COLOR_NONE, APP_COLOR_NONE };
 	BYTE max_bright_level = application_get_max_bright_level();
-	int8 brightness = application_get_brightness_by_level(max_bright_level);
 
 	// set all bright level and color data
 
-	application_allchips_set_all_same_bright_level(brightness, FALSE);
+	application_allchips_set_all_same_bright_level(max_bright_level, FALSE);
 	application_allchips_set_all_same_color(&red, TRUE);
 
 	application_allchips_led_effect_update();
@@ -739,7 +707,7 @@ void application_led_effect_interrupt_handle()
 	// we clear all the leds if led effection change
 	if (NULL != p_led_effect && p_led_effect->last_state != p_led_effect->cur_state) {
 		p_led_effect->cur_idx = 0;
-		application_led_close_all(chip_index);
+		application_allchips_led_close_all();
 	}
 
 	switch (p_led_effect->cur_state) {
@@ -779,71 +747,22 @@ void application_led_effect_interrupt_handle()
 		application_led_effect_keymute();
 		break;
 
-	case LEDS_EFFECT_INCREASE:
-		application_led_effect_increase(chip_index);
-		break;
-
-	case LEDS_EFFECT_DECREASE:
-		application_led_effect_decrease(chip_index);
-		break;
-
 	case LEDS_EFFECT_BRIGHT_CHANGE:
-		application_led_effect_change_bright(chip_index);
+		application_allchips_led_effect_change_bright();
 		break;
 
 	case LEDS_EFFECT_COLOR_CHANGE:
-		application_led_effect_change_color(chip_index);
+		application_allchips_led_effect_change_color();
 		break;
 
 	case LEDS_EFFECT_IMAX_CHANGE:
-		application_led_effect_change_iMax(chip_index);
-		break;
-
-	case LEDS_EFFECT_CIRCLE:
-		if (p_led_effect->last_state != p_led_effect->cur_state) {
-			// clear refresh nums
-			application_set_refresh_nums(0);
-			// set the timer and start it
-			//TODO application_start_timer( application_get_effect_TIMx(), 15 );
-		} else {
-			// just restart TIMx for circle
-			//TODO application_restart_timer( application_get_effect_TIMx() );
-		}
-		application_led_effect_circle(chip_index);
-		break;
-
-	case LEDS_EFFECT_BREATH:
-		if (p_led_effect->last_state != p_led_effect->cur_state) {
-			// clear refresh nums
-			application_set_refresh_nums(0);
-			// set the timer and start it
-			//TODO application_start_timer( application_get_effect_TIMx(), 15 );
-		} else {
-			// just restart TIMx for breath
-			//TODO application_restart_timer( application_get_effect_TIMx() );
-		}
-		application_led_effect_breath(chip_index);
-		break;
-
-	case LEDS_EFFECT_COLOR_BREATH:
-		if (p_led_effect->last_state != p_led_effect->cur_state) {
-			// set the timer and start it
-			//TODO application_start_timer( application_get_effect_TIMx(), 15 );
-		} else {
-			// just restart TIMx for breath
-			//TODO application_restart_timer( application_get_effect_TIMx() );
-		}
-		application_led_effect_color_breath(chip_index);
+		application_allchips_led_effect_change_iMax();
 		break;
 
 	default:
 		break;
 	}
 
-	// Update led effection
-	if (LEDS_EFFECT_IMAX_CHANGE != p_led_effect->cur_state) {
-		application_led_effect_update(chip_index);
-	}
 	// set the last effection state
 	p_led_effect->last_state = p_led_effect->cur_state;
 }

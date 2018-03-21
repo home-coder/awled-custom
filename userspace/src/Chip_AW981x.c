@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "Application_LED.h"
 #include "Chip_AW981x.h"
 
@@ -82,7 +83,17 @@ static void aw981x_write_register_ex(BYTE aw981x_id, BYTE reg_addr, BYTE reg_num
 		reg_access_data.device_addr = led_get_i2c_address(aw981x_id);
 		reg_access_data.base_reg_addr = reg_addr;
 		reg_access_data.regs_num = reg_num;
-
+#ifdef DEBUG
+		int i;
+		printf("aw981x_id:%d, device_commu:%d, device_addr:%x, base_reg_addr:%x, regs_num:%d\n", aw981x_id, reg_access_data.device_commu,
+		       reg_access_data.device_addr, reg_access_data.base_reg_addr, reg_access_data.regs_num);
+		for (i = 0; i < reg_num; i++) {
+			printf("(%d,%x)", i, *(p_value + i));
+			if (0 != i && 0 == i % 3) {
+				printf("\n");
+			}
+		}
+#endif
 		//TODO APPLICATION_WriteRegisters( EVENT_ID_AWCHIP_REG_WRITE_8BIT, &reg_access_data, p_value );
 	}
 }

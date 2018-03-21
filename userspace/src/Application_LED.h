@@ -3,6 +3,10 @@
 
 #include "Application_main_option.h"
 
+#ifndef DEBUG
+#define DEBUG
+#endif
+
 #define msleep(x) usleep(x*1000)
 
 typedef struct{
