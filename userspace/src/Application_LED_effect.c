@@ -11,7 +11,6 @@
 #include "Application_LED_effect.h"
 
 //#include <stdlib.h> 
-#include <stdio.h>
 #include "Chip_AW981x.h"
 
 static const APP_COLOR_STRUCT breath_colors[] = {
@@ -551,15 +550,10 @@ static void application_led_effect_comet(APP_COLOR_STRUCT background, APP_COLOR_
 	BYTE i;
 	BYTE brightness;
 
-	if (NULL == p_led_effect) {
-		printf("p_led_effect is not exsit\n");
-		return;
-	}
-	//start = p_led_effect->cur_idx; 
-	start = 0;
-	led_nums = application_allchips_get_max_leds();
-	half_pos = led_nums / 2;
-	while (p_led_effect->last_state == p_led_effect->cur_state) {
+	if (NULL != p_led_effect) {
+		start = p_led_effect->cur_idx; //0++ 
+		led_nums = application_allchips_get_max_leds();
+		half_pos = led_nums / 2;
 		if (led_nums > 0 && start < led_nums && len < led_nums) {
 			application_allchips_set_all_same_bright_level(len, FALSE);	//len = max_bright_level
 			application_allchips_set_all_same_color(&background, TRUE);
@@ -580,12 +574,8 @@ static void application_led_effect_comet(APP_COLOR_STRUCT background, APP_COLOR_
 			}
 		}
 		application_allchips_led_effect_update();
-		//sleep
-		msleep(300);
-		start++;
-		start %= led_nums;
+		p_led_effect->cur_idx %= led_nums;
 	}
-
 }
 
 /*
@@ -596,8 +586,13 @@ void application_led_effect_bootm_startup()
 {
 	APP_COLOR_STRUCT red = { APP_COLOR_FULL, APP_COLOR_NONE, APP_COLOR_NONE };
 	APP_COLOR_STRUCT blue = { APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_FULL };
+	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
 
-	application_led_effect_comet(blue, red);
+	while (p_led_effect->last_state == p_led_effect->cur_state) {
+		application_led_effect_comet(blue, red);
+		p_led_effect->cur_idx++; 
+		msleep(300);
+	}
 }
 
 /*
@@ -608,8 +603,13 @@ void application_led_effect_bootm_complete()
 {
 	APP_COLOR_STRUCT yellow = { APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_NONE };
 	APP_COLOR_STRUCT white = { APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_FULL };
+	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
 
-	application_led_effect_comet(yellow, white);
+	while (p_led_effect->last_state == p_led_effect->cur_state) {
+		application_led_effect_comet(yellow, white);
+		p_led_effect->cur_idx++; 
+		msleep(300);
+	}
 }
 
 /*
@@ -635,8 +635,13 @@ void application_led_effect_airkiss_config()
 {
 	APP_COLOR_STRUCT yellow = { APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_NONE };
 	APP_COLOR_STRUCT black = { APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_NONE };
+	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
 
-	application_led_effect_comet(yellow, black);
+	while (p_led_effect->last_state == p_led_effect->cur_state) {
+		application_led_effect_comet(yellow, black);
+		p_led_effect->cur_idx++; 
+		msleep(300);
+	}
 }
 
 /*
@@ -709,6 +714,9 @@ void application_led_effect_keymute()
 
 }
 
+/*
+ should can be interrupt, whatever it is over or not
+ */
 void application_led_effect_interrupt_handle()
 {
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
