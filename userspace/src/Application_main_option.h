@@ -1,3 +1,10 @@
+/*************************************************************************
+ > Filename   : Application_main_option.h
+ > Author     : oneface - one_face@sina.com
+ > Company    : 一尊还酹江月
+ > Time       : 2018-03-22 10:51:35
+ ************************************************************************/
+
 #ifndef __APPLICATION_MAIN_OPTION_H__
 #define __APPLICATION_MAIN_OPTION_H__
 

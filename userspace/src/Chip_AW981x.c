@@ -1,3 +1,10 @@
+/*************************************************************************
+ > Filename   : Chip_AW981x.c
+ > Author     : oneface - one_face@sina.com
+ > Company    : 一尊还酹江月
+ > Time       : 2018-03-22 10:54:21
+ ************************************************************************/
+
 #include <stdio.h>
 #include "Application_LED.h"
 #include "Chip_AW981x.h"

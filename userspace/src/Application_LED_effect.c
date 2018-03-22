@@ -1,3 +1,12 @@
+/*************************************************************************
+ > Filename   : Application_LED_effect.c
+ > Author     : oneface - one_face@sina.com
+ > Company    : 一尊还酹江月
+ > Time       : 2018-03-22 10:43:48
+ ************************************************************************/
+
+#include <stdio.h>
+
 #include "Application_LED_interface.h"
 #include "Application_LED_effect.h"
 

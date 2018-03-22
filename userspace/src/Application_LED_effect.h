@@ -1,3 +1,10 @@
+/*************************************************************************
+ > Filename   : Application_LED_effect.h
+ > Author     : oneface - one_face@sina.com
+ > Company    : 一尊还酹江月
+ > Time       : 2018-03-22 10:46:09
+ ************************************************************************/
+
 #ifndef __APPLICATION_LED_EFFECT_H__
 #define __APPLICATION_LED_EFFECT_H__
 

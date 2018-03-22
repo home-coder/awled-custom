@@ -1,3 +1,12 @@
+/*************************************************************************
+ > Filename   : Application_LED.c
+ > Author     : oneface - one_face@sina.com
+ > Company    : 一尊还酹江月
+ > Time       : 2018-03-22 10:44:57
+ ************************************************************************/
+
+#include <stdio.h>
+
 #include "Application_LED_customize.h"
 #include "Application_LED.h"
 
