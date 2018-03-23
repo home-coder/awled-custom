@@ -692,9 +692,7 @@ void application_led_effect_command_success()
 	APP_COLOR_STRUCT blue = { APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_FULL };
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
 
-	while (p_led_effect->last_state != p_led_effect->cur_state) {
-		application_led_effect_breath();
-	}
+	application_led_effect_breath();
 }
 
 /*
@@ -712,76 +710,6 @@ void application_led_effect_keymute()
 
 	application_allchips_led_effect_update();
 
-}
-
-/*
- should can be interrupt, whatever it is over or not
- */
-void application_led_effect_interrupt_handle()
-{
-	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
-
-	// we clear all the leds if led effection change
-	if (NULL != p_led_effect && p_led_effect->last_state != p_led_effect->cur_state) {
-		p_led_effect->cur_idx = 0;
-		application_allchips_led_close_all();
-	}
-
-	switch (p_led_effect->cur_state) {
-	case LEDS_EFFECT_STARTUP:
-		application_led_effect_bootm_startup();
-		break;
-
-	case LEDS_EFFECT_COMPLETE:
-		application_led_effect_bootm_complete();
-		break;
-
-	case LEDS_EFFECT_AIRKISS_MODE:
-		application_led_effect_airkiss_mode();
-		break;
-
-	case LEDS_EFFECT_AIRKISS_CONFIG:
-		application_led_effect_airkiss_config();
-		break;
-
-	case LEDS_EFFECT_AIRKISS_CONNECT:
-		application_led_effect_airkiss_connect();
-		break;
-
-	case LEDS_EFFECT_WAKE_UP:
-		application_led_effect_wake_up();
-		break;
-
-	case LEDS_EFFECT_COMMAND_FAIL:
-		application_led_effect_command_fail();
-		break;
-
-	case LEDS_EFFECT_COMMAND_SUCCESS:
-		application_led_effect_command_success();
-		break;
-
-	case LEDS_EFFECT_KEYMUTE:
-		application_led_effect_keymute();
-		break;
-
-	case LEDS_EFFECT_BRIGHT_CHANGE:
-		application_allchips_led_effect_change_bright();
-		break;
-
-	case LEDS_EFFECT_COLOR_CHANGE:
-		application_allchips_led_effect_change_color();
-		break;
-
-	case LEDS_EFFECT_IMAX_CHANGE:
-		application_allchips_led_effect_change_iMax();
-		break;
-
-	default:
-		break;
-	}
-
-	// set the last effection state
-	p_led_effect->last_state = p_led_effect->cur_state;
 }
 
 // led effect end

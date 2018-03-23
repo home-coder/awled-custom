@@ -36,7 +36,7 @@ static void push_state_queue(APP_LED_EFFECT_ENUM state)
 {
 	//TODO mutex
 	pthread_mutex_lock(&state_lock);
-	printf("push stack-state :%d\n", state);
+	Application_debug("push stack-state :%d\n", state);
 	linestack *line = (linestack *) malloc(sizeof(linestack));
 	line->cmd_type = state;
 	line->next = stack;
@@ -48,18 +48,19 @@ static APP_LED_EFFECT_ENUM pop_state_queue()
 {
 	//TODO mutex
 	pthread_mutex_lock(&state_lock);
-	printf("pop ");
+	Application_debug("pop ");
 	APP_LED_EFFECT_ENUM state = LEDS_EFFECT_NONE;
 	if (stack) {
 		linestack *p = stack;
 		stack = stack->next;
 		state = p->cmd_type;
-		printf("stack-state ：%d \n", state);
+		Application_debug("stack-state ：%d \n", state);
 		free(p);
 	} else {
-		printf("stack null\n");
+		Application_debug("stack null\n");
 	}
 	pthread_mutex_unlock(&state_lock);
+
 	return state;
 }
 
@@ -83,7 +84,7 @@ void send_event(APP_LED_EFFECT_ENUM state)
 	p_led_effect->cur_state = state;
 	//clear timer
 	if (p_led_effect->cur_state != p_led_effect->last_state) {	//state != last state, clear
-		printf("clear timer\n");
+		Application_debug("clear timer\n");
 		clear_timer();
 		switch (state) {
 			case LEDS_EFFECT_STARTUP:
@@ -134,7 +135,7 @@ static void timer_function(int interval, effect_handle e_handle_state)
 	temp.tv_sec = 0;
 	temp.tv_usec = interval;
 	select(0, NULL, NULL, NULL, &temp);
-	//e_handle_state();
+	e_handle_state();
 }
 
 /*
@@ -145,12 +146,12 @@ static void handle_event(void *param)
 	APP_LED_EFFECT_STRUCT *p_led_effect = NULL;
 	APP_LED_EFFECT_ENUM state;
 
-	printf("handle event\n");
+	Application_debug("handle event\n");
 	while (1) {
 		msleep(200);
 		state = pop_state_queue();	// after every case-break, here will go
 		if (state == LEDS_EFFECT_NONE) {
-			printf("state is null, continue\n");
+			Application_debug("state is null, continue\n");
 			continue;
 		}
 
@@ -184,7 +185,7 @@ static void application_main_event_handler()
 	int err;
 	err = pthread_create(&pidl, NULL, (void *)handle_event, NULL);
 	if (err != 0) {
-		printf("failed\n");
+		Application_debug("failed\n");
 	}
 }
 

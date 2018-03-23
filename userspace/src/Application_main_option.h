@@ -12,6 +12,13 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define APPLICATION_DEBUG
+#ifdef APPLICATION_DEBUG
+#define Application_debug(...)	printf(__VA_ARGS__)
+#else
+#define Application_debug(...)
+#endif
+
 #ifndef Application_malloc
 #define Application_malloc(a)	malloc(a)
 #endif

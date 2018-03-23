@@ -67,7 +67,7 @@ void r16_i2c_writeregisters(BYTE mode, AWCHIP_REGS_ACCESS_STRUCT * reg_access_da
 	R16_I2c_HANDLER *p_i2c_handler = NULL;
 
 	if (NULL == reg_access_data) {
-		printf("reg_access_data is NULL\n");
+		Application_debug("reg_access_data is NULL\n");
 		return;
 	}
 
@@ -120,7 +120,7 @@ void r16_i2c_init()
 		if (NULL != pp_r16_i2c_handler[i]) {
 			pp_r16_i2c_handler[i]->fd = open(r16_i2c_node[i], O_RDWR);
 			if (-1 == pp_r16_i2c_handler[i]->fd) {
-				printf("open %s failed\n", r16_i2c_node[i]);
+				Application_debug("open %s failed\n", r16_i2c_node[i]);
 			}
 		}
 	}
