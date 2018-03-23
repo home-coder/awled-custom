@@ -8,10 +8,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <cutils/properties.h>
 #include <pthread.h>
 
 #include "Application_LED_effect.h"
+
+//some effect will repeat and should support be interrupted
+static int timer = 0x0;
+static int timer_0 = 0x1;				//LEDS_EFFECT_STARTUP
+static int timer_1 = 0x1 << 1;			//LEDS_EFFECT_COMPLETE
+static int timer_2 = 0x1 << 2;			//LEDS_EFFECT_AIRKISS_CONFIG
+static int timer_3 = 0x1 << 3;			//LEDS_EFFECT_AIRKISS_CONNECT
+static int timer_4 = 0x1 << 3;			//LEDS_EFFECT_COMMAND_SUCCESS
 
 pthread_mutex_t state_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -23,66 +30,162 @@ typedef struct _linestack {
 //event stack
 linestack *stack = NULL;
 
+typedef void (*effect_handle) ();
+
 static void push_state_queue(APP_LED_EFFECT_ENUM state)
 {
+	//TODO mutex
+	pthread_mutex_lock(&state_lock);
+	printf("push stack-state :%d\n", state);
 	linestack *line = (linestack *) malloc(sizeof(linestack));
 	line->cmd_type = state;
 	line->next = stack;
 	stack = line;
+	pthread_mutex_unlock(&state_lock);
 }
 
 static APP_LED_EFFECT_ENUM pop_state_queue()
 {
+	//TODO mutex
+	pthread_mutex_lock(&state_lock);
+	printf("pop ");
 	APP_LED_EFFECT_ENUM state = LEDS_EFFECT_NONE;
 	if (stack) {
 		linestack *p = stack;
 		stack = stack->next;
-		printf("stack null：%c \n", p->cmd_type);
 		state = p->cmd_type;
+		printf("stack-state ：%d \n", state);
 		free(p);
 	} else {
 		printf("stack null\n");
 	}
+	pthread_mutex_unlock(&state_lock);
 	return state;
+}
+
+static void clear_timer()
+{
+	timer &= 0;
+}
+
+static void set_timer(int timerx)
+{
+	timer |= timerx;
 }
 
 /*
    App call interface
 */
-void listen_event(APP_LED_EFFECT_ENUM state)
+void send_event(APP_LED_EFFECT_ENUM state)
 {
-	//TODO mutex
 	//push
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
 	p_led_effect->cur_state = state;
-	switch (state) {
-	case:
-	case:
-	case:
-	case:
-		break;
-	case LEDS_EFFECT_STARTUP:
-		//clear timer
-		push_state_queue();
+	//clear timer
+	if (p_led_effect->cur_state != p_led_effect->last_state) {	//state != last state, clear
+		printf("clear timer\n");
+		clear_timer();
+		switch (state) {
+			case LEDS_EFFECT_STARTUP:
+				push_state_queue(LEDS_EFFECT_STARTUP);
+				set_timer(timer_0);
+				break;
+			case LEDS_EFFECT_COMPLETE:
+				push_state_queue(LEDS_EFFECT_COMPLETE);
+				set_timer(timer_1);
+				break;
+			case LEDS_EFFECT_AIRKISS_MODE:
+				push_state_queue(LEDS_EFFECT_AIRKISS_MODE);
+				break;
+			case LEDS_EFFECT_AIRKISS_CONFIG:
+				push_state_queue(LEDS_EFFECT_AIRKISS_CONFIG);
+				set_timer(timer_2);
+				break;
+			case LEDS_EFFECT_AIRKISS_CONNECT:
+				push_state_queue(LEDS_EFFECT_AIRKISS_CONNECT);
+				set_timer(timer_3);
+				break;
+			case LEDS_EFFECT_WAKE_UP:
+				push_state_queue(LEDS_EFFECT_WAKE_UP);
+				break;
+			case LEDS_EFFECT_COMMAND_FAIL:
+				push_state_queue(LEDS_EFFECT_COMMAND_FAIL);
+				break;
+			case LEDS_EFFECT_COMMAND_SUCCESS:
+				push_state_queue(LEDS_EFFECT_COMMAND_SUCCESS);
+				set_timer(timer_4);
+				break;
+			case LEDS_EFFECT_KEYMUTE:
+				push_state_queue(LEDS_EFFECT_KEYMUTE);
+				break;
+			case LEDS_EFFECT_KEYUNMUTE:
+				push_state_queue(LEDS_EFFECT_KEYUNMUTE);
+				break;
+			default:
+				break;
+		}
 	}
+}
+
+static void timer_function(int interval, effect_handle e_handle_state)
+{
+	struct timeval temp;
+
+	temp.tv_sec = 0;
+	temp.tv_usec = interval;
+	select(0, NULL, NULL, NULL, &temp);
+	//e_handle_state();
 }
 
 /*
  loop message queue
  */
-static void handler_event()
+static void handle_event(void *param)
 {
-	//TODO mutex
-	//pop
+	APP_LED_EFFECT_STRUCT *p_led_effect = NULL;
+	APP_LED_EFFECT_ENUM state;
+
+	printf("handle event\n");
 	while (1) {
-		pop_state_queue();
+		msleep(200);
+		state = pop_state_queue();	// after every case-break, here will go
+		if (state == LEDS_EFFECT_NONE) {
+			printf("state is null, continue\n");
+			continue;
+		}
+
+		p_led_effect = application_get_led_effect();
+		p_led_effect->last_state = state;
+		// we clear all the leds if led effection change
+		if (NULL != p_led_effect) {
+			p_led_effect->cur_idx = 0;
+			application_allchips_led_close_all();
+		}
+
+		switch (state) {
+		case LEDS_EFFECT_STARTUP:
+			while (timer & timer_0) {
+				timer_function(500000, application_led_effect_bootm_startup);
+			}
+			break;
+		case LEDS_EFFECT_COMPLETE:
+			while (timer & timer_1) {
+				timer_function(500000, application_led_effect_bootm_complete);
+			}
+			break;
+		}
 	}
 }
 
-static void application_main_handler_event()
+static void application_main_event_handler()
 {
-	//creat
-
+	//TODO self-delete creat
+	pthread_t pidl;
+	int err;
+	err = pthread_create(&pidl, NULL, (void *)handle_event, NULL);
+	if (err != 0) {
+		printf("failed\n");
+	}
 }
 
 static void application_main_init(void)
@@ -101,18 +204,39 @@ static void application_main_init(void)
 	}
 
 	//creat event handler pthread outof main thread
-	application_main_handler_event();
+	application_main_event_handler();
 }
 
 static void application_main_test()
 {
-	//check chip id
-	application_set_led_cur_state();
-	application_led_effect_interrupt_handle();
-	//change imax
-	application_set_led_cur_state(LEDS_EFFECT_IMAX_CHANGE);
-	application_led_effect_interrupt_handle();
-	//
+	while (1) {
+		send_event(LEDS_EFFECT_STARTUP);
+		sleep(1);
+		send_event(LEDS_EFFECT_STARTUP);
+		sleep(1);
+		send_event(LEDS_EFFECT_STARTUP);
+		sleep(1);
+		send_event(LEDS_EFFECT_STARTUP);
+		sleep(1);
+		send_event(LEDS_EFFECT_STARTUP);
+		sleep(1);
+		send_event(LEDS_EFFECT_COMPLETE);
+		sleep(1);
+	#if 0
+		send_event(LEDS_EFFECT_AIRKISS_MODE);
+		sleep(1);
+		send_event(LEDS_EFFECT_AIRKISS_CONFIG);
+		sleep(1);
+		send_event(LEDS_EFFECT_AIRKISS_CONNECT);
+		sleep(1);
+		send_event(LEDS_EFFECT_WAKE_UP);
+		sleep(1);
+		send_event(LEDS_EFFECT_COMMAND_FAIL);
+		sleep(1);
+	#endif
+		send_event(LEDS_EFFECT_STARTUP);
+		sleep(1);
+	}
 }
 
 static void application_led_buffer_uninit(void)
@@ -128,8 +252,8 @@ static void application_main_uninit(void)
 int main()
 {
 	application_main_init();
-	application_effect_test();
 
+	application_main_test();
 	application_main_uninit();
 
 	return 0;

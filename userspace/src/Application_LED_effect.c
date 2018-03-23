@@ -58,7 +58,7 @@ static WORD application_get_refresh_nums(void)
 }
 
 // led effect begin
-static APP_LED_EFFECT_STRUCT *application_get_led_effect(void)
+APP_LED_EFFECT_STRUCT *application_get_led_effect(void)
 {
 	static APP_LED_EFFECT_STRUCT led_effect;
 
@@ -134,7 +134,7 @@ static void application_led_close_all(BYTE chip_index)
 	application_set_all_same_color(chip_index, &color, TRUE);
 }
 
-static void application_allchips_led_close_all()
+void application_allchips_led_close_all()
 {
 	BYTE chip_index;
 
