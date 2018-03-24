@@ -90,7 +90,7 @@ static void aw981x_write_register_ex(BYTE aw981x_id, BYTE reg_addr, BYTE reg_num
 		reg_access_data.device_addr = led_get_i2c_address(aw981x_id);
 		reg_access_data.base_reg_addr = reg_addr;
 		reg_access_data.regs_num = reg_num;
-#ifdef APPLICATION_DEBUG
+#ifndef APPLICATION_DEBUG
 		int i;
 		Application_debug("aw981x_id:%d, device_commu:%d, device_addr:%x, base_reg_addr:%x, regs_num:%d\n", aw981x_id, reg_access_data.device_commu,
 		       reg_access_data.device_addr, reg_access_data.base_reg_addr, reg_access_data.regs_num);

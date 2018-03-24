@@ -37,6 +37,7 @@ static const BYTE gamma_brightness[] = {
 static const BYTE gamma_levels = sizeof(gamma_brightness) / sizeof(BYTE);
 
 static WORD application_refresh_nums = 0;
+static BYTE cur_circle = 0;
 
 static const BYTE chip_iMax[] = {
 	AW981X_IMAX_10MA,
@@ -540,7 +541,17 @@ static void application_led_effect_color_breath(BYTE chip_index)
 	}
 }
 
-static void application_led_effect_comet(APP_COLOR_STRUCT background, APP_COLOR_STRUCT forward)
+void application_set_circle_nums(BYTE circle)
+{
+	cur_circle = circle;
+}
+
+static BYTE application_get_circle_nums()
+{
+	return cur_circle;
+}
+
+static BYTE application_led_effect_comet(APP_COLOR_STRUCT background, APP_COLOR_STRUCT forward)
 {
 	APP_LEDS_MOVE_DIR dir = LEDS_MOVE_CW;
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
@@ -551,7 +562,7 @@ static void application_led_effect_comet(APP_COLOR_STRUCT background, APP_COLOR_
 	BYTE brightness;
 
 	if (NULL != p_led_effect) {
-		start = p_led_effect->cur_idx; //0++ 
+		start = p_led_effect->cur_idx; //0++ 1++ 2++
 		led_nums = application_allchips_get_max_leds();
 		half_pos = led_nums / 2;
 		if (led_nums > 0 && start < led_nums && len < led_nums) {
@@ -574,7 +585,12 @@ static void application_led_effect_comet(APP_COLOR_STRUCT background, APP_COLOR_
 			}
 		}
 		application_allchips_led_effect_update();
+		p_led_effect->cur_idx++; 
 		p_led_effect->cur_idx %= led_nums;
+		if (p_led_effect->cur_idx == 0) {
+			cur_circle++;
+			application_set_circle_nums(cur_circle);		
+		}
 	}
 }
 
@@ -588,11 +604,7 @@ void application_led_effect_bootm_startup()
 	APP_COLOR_STRUCT blue = { APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_FULL };
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
 
-	while (p_led_effect->last_state == p_led_effect->cur_state) {
-		application_led_effect_comet(blue, red);
-		p_led_effect->cur_idx++; 
-		msleep(300);
-	}
+	application_led_effect_comet(blue, red);
 }
 
 /*
@@ -605,10 +617,11 @@ void application_led_effect_bootm_complete()
 	APP_COLOR_STRUCT white = { APP_COLOR_FULL, APP_COLOR_FULL, APP_COLOR_FULL };
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
 
-	while (p_led_effect->last_state == p_led_effect->cur_state) {
-		application_led_effect_comet(yellow, white);
-		p_led_effect->cur_idx++; 
-		msleep(300);
+	Application_debug("complete\n");
+	application_led_effect_comet(yellow, white);
+	if (application_get_circle_nums() == 3) {
+		clear_timer();
+		Application_debug("quit bootm\n");
 	}
 }
 
@@ -637,11 +650,7 @@ void application_led_effect_airkiss_config()
 	APP_COLOR_STRUCT black = { APP_COLOR_NONE, APP_COLOR_NONE, APP_COLOR_NONE };
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
 
-	while (p_led_effect->last_state == p_led_effect->cur_state) {
-		application_led_effect_comet(yellow, black);
-		p_led_effect->cur_idx++; 
-		msleep(300);
-	}
+	application_led_effect_comet(yellow, black);
 }
 
 /*

@@ -64,7 +64,7 @@ static APP_LED_EFFECT_ENUM pop_state_queue()
 	return state;
 }
 
-static void clear_timer()
+void clear_timer()
 {
 	timer &= 0;
 }
@@ -160,18 +160,19 @@ static void handle_event(void *param)
 		// we clear all the leds if led effection change
 		if (NULL != p_led_effect) {
 			p_led_effect->cur_idx = 0;
+			application_set_circle_nums(0);
 			application_allchips_led_close_all();
 		}
 
 		switch (state) {
-		case LEDS_EFFECT_STARTUP:
+		case LEDS_EFFECT_STARTUP: //TODO should be in kernel
 			while (timer & timer_0) {
 				timer_function(500000, application_led_effect_bootm_startup);
 			}
 			break;
 		case LEDS_EFFECT_COMPLETE:
 			while (timer & timer_1) {
-				timer_function(500000, application_led_effect_bootm_complete);
+				timer_function(5000, application_led_effect_bootm_complete);
 			}
 			break;
 		}
@@ -222,7 +223,7 @@ static void application_main_test()
 		send_event(LEDS_EFFECT_STARTUP);
 		sleep(1);
 		send_event(LEDS_EFFECT_COMPLETE);
-		sleep(1);
+		sleep(50);
 	#if 0
 		send_event(LEDS_EFFECT_AIRKISS_MODE);
 		sleep(1);
