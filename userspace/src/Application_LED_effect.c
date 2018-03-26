@@ -551,7 +551,7 @@ static BYTE application_get_circle_nums()
 	return cur_circle;
 }
 
-static BYTE application_led_effect_comet(APP_COLOR_STRUCT background, APP_COLOR_STRUCT forward)
+static void application_led_effect_comet(APP_COLOR_STRUCT background, APP_COLOR_STRUCT forward)
 {
 	APP_LEDS_MOVE_DIR dir = LEDS_MOVE_CW;
 	APP_LED_EFFECT_STRUCT *p_led_effect = application_get_led_effect();
@@ -619,7 +619,7 @@ void application_led_effect_bootm_complete()
 
 	Application_debug("complete\n");
 	application_led_effect_comet(yellow, white);
-	if (application_get_circle_nums() == 3) {
+	if (application_get_circle_nums() == 3) { //3 circles over, it will quit
 		clear_timer();
 		Application_debug("quit bootm\n");
 	}

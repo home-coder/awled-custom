@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include "Application_main.h"
 #include "Application_LED_effect.h"
 
 //some effect will repeat and should support be interrupted
@@ -34,7 +35,6 @@ typedef void (*effect_handle) ();
 
 static void push_state_queue(APP_LED_EFFECT_ENUM state)
 {
-	//TODO mutex
 	pthread_mutex_lock(&state_lock);
 	Application_debug("push stack-state :%d\n", state);
 	linestack *line = (linestack *) malloc(sizeof(linestack));
@@ -46,7 +46,6 @@ static void push_state_queue(APP_LED_EFFECT_ENUM state)
 
 static APP_LED_EFFECT_ENUM pop_state_queue()
 {
-	//TODO mutex
 	pthread_mutex_lock(&state_lock);
 	Application_debug("pop ");
 	APP_LED_EFFECT_ENUM state = LEDS_EFFECT_NONE;
@@ -190,9 +189,11 @@ static void application_main_event_handler()
 	}
 }
 
-static void application_main_init(void)
+void application_main_init(void)
 {
 	int i;
+	Application_debug("application_main_init...\n");
+
 	// Initialize buffer for writing chip registers
 	led_init_regs_buffer();
 
@@ -209,6 +210,7 @@ static void application_main_init(void)
 	application_main_event_handler();
 }
 
+#ifdef LINUX_PLATFORM
 static void application_main_test()
 {
 	while (1) {
@@ -240,10 +242,12 @@ static void application_main_test()
 		sleep(1);
 	}
 }
+#endif
 
-static void application_led_buffer_uninit(void)
+void application_led_buffer_uninit(void)
 {
 	//TODO  free buffers
+	//detach thread
 }
 
 static void application_main_uninit(void)
@@ -251,6 +255,7 @@ static void application_main_uninit(void)
 	application_led_buffer_uninit();
 }
 
+#ifdef LINUX_PLATFORM
 int main()
 {
 	application_main_init();
@@ -260,3 +265,4 @@ int main()
 
 	return 0;
 }
+#endif

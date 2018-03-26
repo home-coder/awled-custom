@@ -12,11 +12,20 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifndef LINUX_PLATFORM
+#include "cutils/log.h"
+#ifdef LOG_TAG
+#undef LOG_TAG
+#define LOG_TAG "awledcontorl"
+#define Application_debug(...)	__android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
+#endif
+#else
 #define APPLICATION_DEBUG
 #ifdef APPLICATION_DEBUG
 #define Application_debug(...)	printf(__VA_ARGS__)
 #else
 #define Application_debug(...)
+#endif
 #endif
 
 #ifndef Application_malloc

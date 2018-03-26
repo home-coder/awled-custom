@@ -62,7 +62,7 @@ static void r16_i2c_set_handler_buf(R16_I2c_HANDLER ** pp_r16_i2c_handler)
 void r16_i2c_writeregisters(BYTE mode, AWCHIP_REGS_ACCESS_STRUCT * reg_access_data, BYTE * p_value)
 {
 	int fd = -1, i;
-	BYTE retry = 2, ret = -1;
+	int retry = 2, ret = -1;
 	BYTE dcommu, base_reg, reg_num;
 	R16_I2c_HANDLER *p_i2c_handler = NULL;
 
