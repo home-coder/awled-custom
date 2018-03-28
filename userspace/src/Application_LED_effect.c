@@ -705,7 +705,7 @@ void application_led_effect_command_success()
 }
 
 /*
- 一圈灯变成红色(mute), 无色(unmute)
+ 一圈灯变成红色(mute),如果被其他状态打断，那么需要判断按键是否是按下的，如果是则其他效果执行完成后要恢复mute的红色效果
  */
 void application_led_effect_keymute()
 {
@@ -719,6 +719,15 @@ void application_led_effect_keymute()
 
 	application_allchips_led_effect_update();
 
+}
+
+/*
+ 一圈灯的颜色消失(unmute)
+ */
+void application_led_effect_keyunmute()
+{
+	application_allchips_led_close_all();
+	application_allchips_led_effect_update();
 }
 
 // led effect end

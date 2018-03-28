@@ -14,8 +14,8 @@
 #include "Application_LED_effect.h"
 
 //some effect will repeat and should support be interrupted
-static int timer = 0x0;
-static int timer_0 = 0x1;				//LEDS_EFFECT_STARTUP
+static int timer   = 0x0;
+static int timer_0 = 0x1;     			//LEDS_EFFECT_STARTUP
 static int timer_1 = 0x1 << 1;			//LEDS_EFFECT_COMPLETE
 static int timer_2 = 0x1 << 2;			//LEDS_EFFECT_AIRKISS_CONFIG
 static int timer_3 = 0x1 << 3;			//LEDS_EFFECT_AIRKISS_CONNECT

@@ -45,6 +45,14 @@ extern void application_led_effect_init(BYTE chip_index);
 extern void application_allchips_led_close_all();
 extern void application_led_effect_bootm_startup();
 extern void application_led_effect_bootm_complete();
+extern void application_led_effect_airkiss_mode();
+extern void application_led_effect_airkiss_config();
+extern void application_led_effect_airkiss_connect();
+extern void application_led_effect_wake_up();
+extern void application_led_effect_command_fail();
+extern void application_led_effect_command_success();
+extern void application_led_effect_keymute();
+extern void application_led_effect_keyunmute();
 extern void application_led_effect_interrupt_handle();
 
 #endif  /* __APPLICATION_LED_EFFECT_H__ */

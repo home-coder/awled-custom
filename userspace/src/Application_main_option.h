@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define LINUX_PLATFORM
 #ifndef LINUX_PLATFORM
 #include "cutils/log.h"
 #ifdef LOG_TAG
