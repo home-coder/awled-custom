@@ -13,7 +13,7 @@
 #include "Application_main.h"
 #include "Application_LED_effect.h"
 
-//some effect will repeat and should support be interrupted
+//some effect will repeat and should support be interrupted, timer is very useful but timer_x is just for reading easier !
 static int timer   = 0x0;
 static int timer_0 = 0x1;     			//LEDS_EFFECT_STARTUP
 static int timer_1 = 0x1 << 1;			//LEDS_EFFECT_COMPLETE

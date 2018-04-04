@@ -575,6 +575,7 @@ static void application_led_effect_comet(APP_COLOR_STRUCT background, APP_COLOR_
 					end = (start + i) % led_nums;
 				}
 				brightness = application_get_brightness_by_level(i);
+				//we have two aw9818 chips
 				if (end < half_pos) {
 					application_set_led_brightness(0, end, brightness, FALSE);
 					application_set_led_color(0, end, &forward, TRUE);
@@ -665,7 +666,7 @@ void application_led_effect_airkiss_connect()
 /*
  一圈蓝色灯亮起，发声方向处变为白色
  */
-void application_led_effect_wake_up()
+void application_led_effect_wake_up()//TODO Propery is nice
 {
 	//direction:property
 
@@ -707,7 +708,7 @@ void application_led_effect_command_success()
 /*
  一圈灯变成红色(mute),如果被其他状态打断，那么需要判断按键是否是按下的，如果是则其他效果执行完成后要恢复mute的红色效果
  */
-void application_led_effect_keymute()
+void application_led_effect_keymute()//TODO
 {
 	APP_COLOR_STRUCT red = { APP_COLOR_FULL, APP_COLOR_NONE, APP_COLOR_NONE };
 	BYTE max_bright_level = application_get_max_bright_level();
