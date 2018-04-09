@@ -59,7 +59,7 @@ typedef unsigned char byte;
 #define LED_CHIP_NUMS	2
 
 #define IOCTL
-#ifdef IOCTL //same as app
+#ifdef IOCTL			//same as app
 typedef enum {
 	LEDS_EFFECT_NONE = 0,
 	LEDS_EFFECT_STARTUP,	/*board power on */
@@ -79,10 +79,19 @@ typedef enum {
 } APP_LED_EFFECT_ENUM;
 
 #define AW9818_IOC_MAGIC 'm'	//定义类型
-#define AW9818_LEDS_EFFECT_COMPLETE _IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_COMPLETE, int)
+#define AW9818_LEDS_EFFECT_COMPLETE			_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_COMPLETE, int)
+#define AW9818_LEDS_EFFECT_AIRKISS_MODE		_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_AIRKISS_MODE, int)
+#define AW9818_LEDS_EFFECT_AIRKISS_CONFIG	_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_AIRKISS_CONFIG, int)
+#define AW9818_LEDS_EFFECT_AIRKISS_CONNECT  _IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_AIRKISS_CONNECT, int)
+#define AW9818_LEDS_EFFECT_WAKE_UP			_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_WAKE_UP, int)
+#define AW9818_LEDS_EFFECT_COMMAND_FAIL		_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_COMMAND_FAIL, int)
+#define AW9818_LEDS_EFFECT_COMMAND_SUCCESS  _IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_COMMAND_SUCCESS, int)
+#define AW9818_LEDS_EFFECT_KEYMUTE		    _IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_KEYMUTE, int)
+#define AW9818_LEDS_EFFECT_KEYUNMUTE		_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_KEYUNMUTE, int)
 #endif
 
 static byte effect_complete = 1;
+static byte effect_config = 1;
 
 //bright value
 typedef struct {
@@ -321,6 +330,7 @@ static void ledeffect_info_init(void)
 	set_ledeffect_info(ledeffect_info_struct);
 }
 
+#ifdef AW9818_READ
 static int aw9818_read(u8 reg, u8 * rt_value, struct i2c_client *client)
 {
 	int ret;
@@ -347,6 +357,7 @@ static int aw9818_read(u8 reg, u8 * rt_value, struct i2c_client *client)
 
 	return 0;
 }
+#endif
 
 int aw9818_write(u8 reg, unsigned char value, struct i2c_client *client)
 {
@@ -370,107 +381,6 @@ static void aw981x_write_register(CHIP_ID chip_id, byte reg, byte data)
 	pr_err("id 0x%x, reg 0x%x, data 0x%x\n", chip_id, reg, data);
 
 	aw9818_write(reg, data, g_aw9818->i2c_cli[chip_id]);
-}
-
-static void aw981x_enable_chip(void)
-{
-	byte aw981x_id;
-
-	for (aw981x_id = 0; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
-		// enable chip
-		aw981x_write_register(aw981x_id, aw981x_sleep_reg, aw981x_en_value);
-	}
-}
-
-static void led_default_setup(void)
-{
-	byte aw981x_id;
-	pr_err("%s\n", __func__);
-
-	for (aw981x_id = 0; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
-		// reset chip
-		aw981x_write_register(aw981x_id, aw981x_reset_reg, aw981x_reset_value);
-		// configure Imax and mode
-		aw981x_write_register(aw981x_id, aw981x_config_reg, aw981x_config_value);
-	}
-
-	aw981x_enable_chip();
-}
-
-static void led_init(void)
-{
-	ledif_info_init();
-	ledeffect_info_init();
-	led_default_setup();
-}
-
-static int aw9818_open(struct inode *inode, struct file *filp)
-{
-	struct aw9818_priv *aw9818 = container_of(inode->i_cdev,
-						  struct aw9818_priv, cdev);
-
-	filp->private_data = aw9818;
-
-	return 0;
-}
-
-/*
- *
- *eg: a signal like "startup-complete"
- */
-static long aw9818_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
-{
-	switch (cmd) {
-	case AW9818_LEDS_EFFECT_COMPLETE:
-		effect_complete = 0;
-		//TODO set unblank
-		break;
-	default:
-		break;
-	}
-
-	return 0;
-}
-
-static int aw9818_release(struct inode *inode, struct file *filp)
-{
-	return 0;
-}
-
-static struct file_operations aw9818_fops = {
-	.owner = THIS_MODULE,
-	.open = aw9818_open,
-	.unlocked_ioctl = aw9818_unlocked_ioctl,
-	.release = aw9818_release,
-};
-
-/*
- *
- *this function is a typical cdev module
- */
-static int aw9818_setup_cdev(struct aw9818_priv *data)
-{
-	int ret;
-	static int dev_major = DEV_MAJOR;
-	static int dev_minor = DEV_MINOR;
-
-	data->devno = MKDEV(dev_major, dev_minor);
-	if (dev_major) {
-		ret = register_chrdev_region(data->devno, 1, DEV_NAME);
-	} else {
-		ret = alloc_chrdev_region(&data->devno, dev_minor, 1, DEV_NAME);
-	}
-	if (ret < 0)
-		return ret;
-
-	cdev_init(&data->cdev, &aw9818_fops);
-	ret = cdev_add(&data->cdev, data->devno, 1);
-	if (ret)
-		pr_err("error add a char dev");
-	data->class = class_create(THIS_MODULE, DEV_NAME);
-	data->device = device_create(data->class, NULL, data->devno, NULL, DEV_NAME);
-
-	return 0;
 }
 
 static byte convert_data(byte brightness, LED_COLOR_LEVEL color)
@@ -545,6 +455,59 @@ static void led_set_all_bright_color(byte led_nums, byte brightness, const ledco
 	}
 }
 
+static void aw981x_enable_chip(void)
+{
+	byte aw981x_id;
+
+	for (aw981x_id = 0; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
+		// enable chip
+		aw981x_write_register(aw981x_id, aw981x_sleep_reg, aw981x_en_value);
+	}
+}
+
+static void led_default_setup(void)
+{
+	byte aw981x_id;
+	pr_err("%s\n", __func__);
+
+	for (aw981x_id = 0; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
+		// reset chip
+		aw981x_write_register(aw981x_id, aw981x_reset_reg, aw981x_reset_value);
+		// configure Imax and mode
+		aw981x_write_register(aw981x_id, aw981x_config_reg, aw981x_config_value);
+	}
+
+	aw981x_enable_chip();
+}
+
+static void led_init(void)
+{
+	ledif_info_init();
+	ledeffect_info_init();
+	led_default_setup();
+}
+
+static void led_effect_close(void)
+{
+	const ledcolor_info color = led_colors[none];
+	byte led_nums = get_led_nums(0) + get_led_nums(1);
+	pr_err("%s\n", __func__);
+
+	led_set_all_bright_color(led_nums, 0, color);
+
+	aw981x_enable_chip();
+}
+
+static int aw9818_open(struct inode *inode, struct file *filp)
+{
+	struct aw9818_priv *aw9818 = container_of(inode->i_cdev,
+						  struct aw9818_priv, cdev);
+
+	filp->private_data = aw9818;
+
+	return 0;
+}
+
 static void led_set_comet(byte cur_idx, const ledcolor_info foward)
 {
 	byte comet_nums, i;
@@ -556,8 +519,14 @@ static void led_set_comet(byte cur_idx, const ledcolor_info foward)
 
 }
 
-static void effect_comet_function(byte led_nums, byte cur_idx, byte brightness, const ledcolor_info background, const ledcolor_info foward)
+static void effect_comet_function(byte cur_idx, const ledcolor_info background, const ledcolor_info foward)
 {
+	byte led_nums, comet_nums, brightness;
+
+	led_nums = get_led_nums(0) + get_led_nums(1);
+	comet_nums = sizeof(led_bright_level) / sizeof(led_bright_level[0]);
+	brightness = led_bright_level[comet_nums - 1];	//故意设置背景色比comet最大值暗一些
+
 	//set all background
 	led_set_all_bright_color(led_nums, brightness, background);
 
@@ -574,25 +543,137 @@ static void effect_comet_function(byte led_nums, byte cur_idx, byte brightness, 
  */
 static void aw9818_startup(struct work_struct *ws)
 {
-	byte led_nums, comet_nums;
 	ledeffect_info *p_led_effect = get_led_effect();
 	pr_err("%s\n", __func__);
 
 	if (NULL != p_led_effect) {
-		led_nums = get_led_nums(0) + get_led_nums(1);
-		comet_nums = sizeof(led_bright_level) / sizeof(led_bright_level[0]);
-
 		p_led_effect->background = led_colors[none];
 		p_led_effect->foward = led_colors[yellow];
 		p_led_effect->cur_idx = 0;
-		p_led_effect->bright_level = led_bright_level[comet_nums - 1];	//故意设置背景色比comet最大值暗一些
 
-		while (p_led_effect->cur_idx < led_nums - comet_nums) {
-			effect_comet_function(led_nums, p_led_effect->cur_idx, p_led_effect->bright_level, p_led_effect->background,
-					      p_led_effect->foward);
+		while (effect_complete) {
+			effect_comet_function(p_led_effect->cur_idx, p_led_effect->background, p_led_effect->foward);
 			p_led_effect->cur_idx++;
+			msleep(500);
 		}
 	}
+}
+
+/*
+ *
+ * 一圈橙色的灯亮起
+ */
+void led_effect_airkiss_mode(void)
+{
+	const ledcolor_info color = led_colors[orange];
+	byte led_nums = get_led_nums(0) + get_led_nums(1);
+	pr_err("%s\n", __func__);
+
+	led_set_all_bright_color(led_nums, 0, color);
+
+	aw981x_enable_chip();
+}
+
+/*
+ *
+ * 浅黄色的灯以 彗星 模式转动
+ */
+void application_led_effect_airkiss_config(void)
+{
+	ledeffect_info *p_led_effect = get_led_effect();
+	pr_err("%s\n", __func__);
+
+	if (NULL != p_led_effect) {
+		p_led_effect->background = led_colors[none];
+		p_led_effect->foward = led_colors[yellow];
+		p_led_effect->cur_idx = 0;
+
+		while (effect_config) {
+			effect_comet_function(p_led_effect->cur_idx, p_led_effect->background, p_led_effect->foward);
+			p_led_effect->cur_idx++;
+			msleep(500);
+		}
+	}
+
+}
+
+/*
+ *
+ *eg: a signal like "startup-complete"
+ */
+static long aw9818_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case AW9818_LEDS_EFFECT_COMPLETE:
+		effect_complete = 0;
+		led_effect_close();
+		break;
+	case AW9818_LEDS_EFFECT_AIRKISS_MODE:
+		led_effect_airkiss_mode();
+		break;
+	case AW9818_LEDS_EFFECT_AIRKISS_CONFIG:
+		break;
+	case AW9818_LEDS_EFFECT_AIRKISS_CONNECT:
+		//set_timer(timer_3);
+		break;
+	case AW9818_LEDS_EFFECT_WAKE_UP:
+		break;
+	case AW9818_LEDS_EFFECT_COMMAND_FAIL:
+		break;
+	case AW9818_LEDS_EFFECT_COMMAND_SUCCESS:
+		//set_timer(timer_4);
+		break;
+	case AW9818_LEDS_EFFECT_KEYMUTE:
+		//do not use a driver interrupt, use keyevent is nice, and the mute should get key-code in keyboard.c
+		break;
+	case AW9818_LEDS_EFFECT_KEYUNMUTE:
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int aw9818_release(struct inode *inode, struct file *filp)
+{
+	return 0;
+}
+
+static struct file_operations aw9818_fops = {
+	.owner = THIS_MODULE,
+	.open = aw9818_open,
+	.unlocked_ioctl = aw9818_unlocked_ioctl,
+	.release = aw9818_release,
+};
+
+/*
+ *
+ *this function is a typical cdev module
+ */
+static int aw9818_setup_cdev(struct aw9818_priv *data)
+{
+	int ret;
+	static int dev_major = DEV_MAJOR;
+	static int dev_minor = DEV_MINOR;
+
+	data->devno = MKDEV(dev_major, dev_minor);
+	if (dev_major) {
+		ret = register_chrdev_region(data->devno, 1, DEV_NAME);
+	} else {
+		ret = alloc_chrdev_region(&data->devno, dev_minor, 1, DEV_NAME);
+	}
+	if (ret < 0)
+		return ret;
+
+	cdev_init(&data->cdev, &aw9818_fops);
+	ret = cdev_add(&data->cdev, data->devno, 1);
+	if (ret)
+		pr_err("error add a char dev");
+	data->class = class_create(THIS_MODULE, DEV_NAME);
+	data->device = device_create(data->class, NULL, data->devno, NULL, DEV_NAME);
+
+	return 0;
 }
 
 /*

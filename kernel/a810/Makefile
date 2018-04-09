@@ -9,5 +9,5 @@ PWD := $(shell pwd)
 all:
 	make $(EXTRA_CFLAGS) -C $(KDIR) M=$(PWD) modules
 clean:
-	rm -rf *.o *.ko *.mod.c *.symvers modules.order .pwm* .tmp_versions *.c~ *.cmd .awinic_9818*
+	rm -rf *.o *.ko *.mod.c *.symvers modules.order  .tmp_versions *.c~ *.cmd .awinic_9818*
 
