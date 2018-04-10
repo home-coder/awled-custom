@@ -51,6 +51,7 @@ struct aw9818_priv {
 	struct device *device;
 	struct workqueue_struct *wqueue;
 	struct work_struct work_startup;
+	struct mutex effect_lock;
 };
 
 struct aw9818_priv *g_aw9818 = NULL;
@@ -90,8 +91,7 @@ typedef enum {
 #define AW9818_LEDS_EFFECT_KEYUNMUTE		_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_KEYUNMUTE, int)
 #endif
 
-static byte effect_complete = 1;
-static byte effect_config = 1;
+static byte state_change = 1;
 
 //bright value
 typedef struct {
@@ -119,6 +119,7 @@ typedef struct {
 	ledreg_data *p_ledreg_data;
 	ledcolor_info *p_ledcolor_info;
 } ledif_info;
+ledif_info *led_intf = NULL;
 
 //hw--
 typedef enum {
@@ -131,7 +132,6 @@ typedef struct {
 	byte led_nums;
 	const ledreg_data *ledreg_map;
 } ledhw_info;
-ledif_info *led_intf = NULL;
 
 typedef enum {
 	ELECTRIC_10mA = (0 << 4),
@@ -170,7 +170,8 @@ static const byte gamma_brightness[] = {
 	52, 54, 55, 57, 59, 61, 62, 63,	//83
 };
 
-static const byte led_bright_level[] = {
+#define BRIGHT_MAX	6
+static const byte led_bright_level[BRIGHT_MAX] = {
 	10, 26, 42, 52, 60, 82,
 };
 
@@ -183,9 +184,11 @@ typedef enum {
 	blue,
 	indigo,
 	purple,
+	white,
 	LED_MAX_COLOR
 } LED_COLOR;
 
+//TODO extendibility
 typedef struct {
 	byte cur_idx;
 	byte bright_level;
@@ -203,6 +206,7 @@ const ledcolor_info led_colors[LED_MAX_COLOR] = {
 	{LED_COLOR_NONE, LED_COLOR_NONE, LED_COLOR_FULL},	// blue
 	{LED_COLOR_NONE, LED_COLOR_FULL, LED_COLOR_FULL},	//indigo
 	{LED_COLOR_FULL, LED_COLOR_NONE, LED_COLOR_FULL},	//purple
+	{LED_COLOR_FULL, LED_COLOR_FULL, LED_COLOR_FULL},	//white
 };
 
 const ledreg_data ledreg_map_9818_1[] = {
@@ -421,8 +425,9 @@ static void led_update_data(byte led_index, ledreg_data * p_ledreg_data)
 	aw981x_write_register(p_ledhw_info->chip_id, lreg->b, p_ledreg_data->b);
 }
 
-static void led_set_bright_color(byte led_index, byte brightness, const ledcolor_info color)
+static void led_set_bright_color(byte led_index, byte brightlevel, const ledcolor_info color)
 {
+	byte brightness;
 	ledif_info *ledif_info_struct = NULL;
 
 	if (led_index < get_led_nums(0)) {
@@ -432,8 +437,9 @@ static void led_set_bright_color(byte led_index, byte brightness, const ledcolor
 	}
 
 	//get brightness by level
-	brightness = gamma_brightness[brightness];
+	brightness = gamma_brightness[brightlevel];
 
+	mutex_lock(&g_aw9818->effect_lock);
 	if (NULL != ledif_info_struct && NULL != ledif_info_struct->p_ledreg_data) {
 		ledif_info_struct->p_ledreg_data->r = convert_data(brightness, color.r);
 		ledif_info_struct->p_ledreg_data->g = convert_data(brightness, color.g);
@@ -443,15 +449,18 @@ static void led_set_bright_color(byte led_index, byte brightness, const ledcolor
 	} else if (ledif_info_struct == NULL) {
 		pr_err("some struct is NULL\n");
 	}
+	mutex_unlock(&g_aw9818->effect_lock);
 
 }
 
-static void led_set_all_bright_color(byte led_nums, byte brightness, const ledcolor_info background)
+static void led_set_all_bright_color(byte brightlevel, const ledcolor_info background)
 {
 	byte i;
+	byte led_nums = get_led_nums(0) + get_led_nums(1);
+
 	for (i = 0; i < led_nums; i++) {
 		pr_err("led %u, led_set_bright_color\n", i);
-		led_set_bright_color(i, brightness, background);
+		led_set_bright_color(i, brightlevel, background);
 	}
 }
 
@@ -485,15 +494,24 @@ static void led_init(void)
 	ledif_info_init();
 	ledeffect_info_init();
 	led_default_setup();
+	mutex_init(&g_aw9818->effect_lock);
 }
 
+/*
+ *
+ *所有的灯关闭，但保持芯片处于工作状态
+ */
 static void led_effect_close(void)
 {
-	const ledcolor_info color = led_colors[none];
-	byte led_nums = get_led_nums(0) + get_led_nums(1);
+	byte bright_level;
+	ledcolor_info background;
+
 	pr_err("%s\n", __func__);
 
-	led_set_all_bright_color(led_nums, 0, color);
+	background = led_colors[none];
+	bright_level = led_bright_level[BRIGHT_MAX];
+
+	led_set_all_bright_color(bright_level, background);
 
 	aw981x_enable_chip();
 }
@@ -508,55 +526,73 @@ static int aw9818_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static void led_set_comet(byte cur_idx, const ledcolor_info foward)
+static void effect_comet_set(byte cur_idx, const ledcolor_info background, const ledcolor_info foward)
 {
-	byte comet_nums, i;
+	byte i, comet_nums, back_brtlevel;
 
 	comet_nums = sizeof(led_bright_level) / sizeof(led_bright_level[0]);
+
+	back_brtlevel = led_bright_level[comet_nums - 1];	//故意设置背景色比comet最大值暗一些
+	//set all background
+	led_set_all_bright_color(back_brtlevel, background);
+	//set comet
 	for (i = 0; i < comet_nums; i++) {
 		led_set_bright_color(cur_idx++, led_bright_level[i], foward);
 	}
-
-}
-
-static void effect_comet_function(byte cur_idx, const ledcolor_info background, const ledcolor_info foward)
-{
-	byte led_nums, comet_nums, brightness;
-
-	led_nums = get_led_nums(0) + get_led_nums(1);
-	comet_nums = sizeof(led_bright_level) / sizeof(led_bright_level[0]);
-	brightness = led_bright_level[comet_nums - 1];	//故意设置背景色比comet最大值暗一些
-
-	//set all background
-	led_set_all_bright_color(led_nums, brightness, background);
-
-	//set comet
-	led_set_comet(cur_idx, foward);
-
-	//enable
-	aw981x_enable_chip();
 }
 
 /*
  *
  * 一圈浅蓝色的灯亮起，浅红色的灯以 彗星 模式转动
  */
-static void aw9818_startup(struct work_struct *ws)
+static void led_effect_startup(struct work_struct *ws)
 {
+	ledcolor_info background, foward;
+
 	ledeffect_info *p_led_effect = get_led_effect();
 	pr_err("%s\n", __func__);
 
 	if (NULL != p_led_effect) {
-		p_led_effect->background = led_colors[none];
-		p_led_effect->foward = led_colors[yellow];
+		background = led_colors[indigo];
+		foward = led_colors[purple];
 		p_led_effect->cur_idx = 0;
 
-		while (effect_complete) {
-			effect_comet_function(p_led_effect->cur_idx, p_led_effect->background, p_led_effect->foward);
+		while (state_change) {
+			effect_comet_set(p_led_effect->cur_idx, background, foward);
+			//enable
+			aw981x_enable_chip();
 			p_led_effect->cur_idx++;
 			msleep(500);
 		}
 	}
+}
+
+/*
+ *
+ * 一圈白色的灯亮起，
+ * 浅蓝色的灯以 彗星 模式转动
+ */
+static void led_effect_complete(void)
+{
+	ledcolor_info background, foward;
+
+	ledeffect_info *p_led_effect = get_led_effect();
+	pr_err("%s\n", __func__);
+
+	if (NULL != p_led_effect) {
+		background = led_colors[white];
+		foward = led_colors[blue];
+		p_led_effect->cur_idx = 0;
+
+		while (state_change) {
+			effect_comet_set(p_led_effect->cur_idx, background, foward);
+			//enable
+			aw981x_enable_chip();
+			p_led_effect->cur_idx++;
+			msleep(500);
+		}
+	}
+
 }
 
 /*
@@ -565,11 +601,13 @@ static void aw9818_startup(struct work_struct *ws)
  */
 void led_effect_airkiss_mode(void)
 {
-	const ledcolor_info color = led_colors[orange];
-	byte led_nums = get_led_nums(0) + get_led_nums(1);
+	byte bright_level;
+	ledcolor_info background;
 	pr_err("%s\n", __func__);
 
-	led_set_all_bright_color(led_nums, 0, color);
+	bright_level =  led_bright_level[BRIGHT_MAX];
+	background = led_colors[orange];
+	led_set_all_bright_color(bright_level, background);
 
 	aw981x_enable_chip();
 }
@@ -578,55 +616,121 @@ void led_effect_airkiss_mode(void)
  *
  * 浅黄色的灯以 彗星 模式转动
  */
-void application_led_effect_airkiss_config(void)
+void led_effect_airkiss_config(void)
 {
+	ledcolor_info background, foward;
+
 	ledeffect_info *p_led_effect = get_led_effect();
 	pr_err("%s\n", __func__);
 
 	if (NULL != p_led_effect) {
-		p_led_effect->background = led_colors[none];
-		p_led_effect->foward = led_colors[yellow];
+		background = led_colors[none];
+		foward = led_colors[yellow];
 		p_led_effect->cur_idx = 0;
 
-		while (effect_config) {
-			effect_comet_function(p_led_effect->cur_idx, p_led_effect->background, p_led_effect->foward);
+		while (state_change) {
+			effect_comet_set(p_led_effect->cur_idx, background, foward);
+			//enable
+			aw981x_enable_chip();
 			p_led_effect->cur_idx++;
 			msleep(500);
 		}
 	}
+}
+
+/*
+ *
+ * 联网成功后，所有灯都熄灭
+ */
+static void led_effect_airkiss_connect(void)
+{
+	pr_err("already close\n");
+}
+
+/*
+ *
+ * 一圈蓝色灯亮起，发声方向处变为白色
+ */
+static void led_effect_wake_up(unsigned long direction)
+{
 
 }
 
 /*
  *
- *eg: a signal like "startup-complete"
+ * 一圈蓝色灯闪烁一下后，全部熄灭
+ */
+static void led_effect_command_fail(void)
+{
+
+}
+
+/*
+ *
+ * 一圈灯由蓝色和浅蓝色交替变换 5s
+ */
+static void led_effect_command_success(void)
+{
+
+}
+
+/*
+ *
+ * 一圈灯变成红色(mute),如果被其他状态打断，那么需要判断按键是否是按下的，如果是则其他效果执行完成后要恢复mute的红色效果
+ */
+static void led_effect_keymute(void)
+{
+
+}
+
+/*
+ *
+ * 一圈灯的颜色消失(unmute)
+ */
+static void led_effect_keyunmute(void)
+{
+
+}
+
+/*
+ *
+ *eg: a signal like "startup-complete"; 2.做好互斥
  */
 static long aw9818_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
+	unsigned long udata;
+	state_change = 0;
+	led_effect_close();
+
+	get_user(udata, (unsigned long __user*)arg);
 	switch (cmd) {
 	case AW9818_LEDS_EFFECT_COMPLETE:
-		effect_complete = 0;
-		led_effect_close();
+		led_effect_complete();
 		break;
 	case AW9818_LEDS_EFFECT_AIRKISS_MODE:
 		led_effect_airkiss_mode();
 		break;
 	case AW9818_LEDS_EFFECT_AIRKISS_CONFIG:
+		led_effect_airkiss_config();
 		break;
 	case AW9818_LEDS_EFFECT_AIRKISS_CONNECT:
-		//set_timer(timer_3);
+		led_effect_airkiss_connect();
 		break;
 	case AW9818_LEDS_EFFECT_WAKE_UP:
+		led_effect_wake_up(udata);
 		break;
 	case AW9818_LEDS_EFFECT_COMMAND_FAIL:
+		led_effect_command_fail();
 		break;
 	case AW9818_LEDS_EFFECT_COMMAND_SUCCESS:
-		//set_timer(timer_4);
+		led_effect_command_success();
 		break;
 	case AW9818_LEDS_EFFECT_KEYMUTE:
+		led_effect_keymute();
 		//do not use a driver interrupt, use keyevent is nice, and the mute should get key-code in keyboard.c
 		break;
 	case AW9818_LEDS_EFFECT_KEYUNMUTE:
+		led_effect_keyunmute();
 		break;
 	default:
 		break;
@@ -679,12 +783,12 @@ static int aw9818_setup_cdev(struct aw9818_priv *data)
 /*
  *loop waitting "start compete sigal" from userspace !
  */
-static void led_effect_startup(void)
+static void aw9818_startup(void)
 {
 	struct aw9818_priv *awdata = g_aw9818;
 
 	if (awdata) {
-		INIT_WORK(&awdata->work_startup, aw9818_startup);
+		INIT_WORK(&awdata->work_startup, led_effect_startup);
 		if (!work_pending(&awdata->work_startup)) {
 			queue_work(awdata->wqueue, &awdata->work_startup);
 		}
@@ -712,7 +816,7 @@ static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2
 		data->i2c_cli[1] = client;
 		led_init();
 		aw9818_setup_cdev(data);
-		led_effect_startup();
+		aw9818_startup();
 	} else if (id->driver_data == 0) {
 		data->i2c_cli[0] = client;
 	}
