@@ -702,6 +702,7 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 			down(&g_aw9818->condition_lock);
 			wait_event_interruptible(data->notify_led_event, g_aw9818->wait_condtion == true || kthread_should_stop());	//FIXME case is 1:interrup coming
 			g_aw9818->wait_condtion = false;
+			g_aw9818->led_thread_sleep = false;
 			g_aw9818->led_thread_running = LED_THREAD_ACTIVE;
 			up(&g_aw9818->condition_lock);
 
@@ -797,7 +798,7 @@ static void do_ctrl_event(unsigned long cmd)
 		up(&g_aw9818->condition_lock);
 
 		//wait running event over
-		mdelay(100);
+		mdelay(50);
 		while (true) {
 			if (g_aw9818->led_thread_sleep == true) {
 				wake_up(&g_aw9818->notify_led_event);
@@ -866,18 +867,28 @@ static int aw9818_setup_cdev(struct aw9818_priv *data)
 	return 0;
 }
 
+void aw9818_mic_key_handler(bool state)
+{
+	unsigned long cmd;
+
+	if (state == true) {
+		cmd = AW9818_LEDS_EFFECT_KEYMUTE;
+	} else {
+		cmd = AW9818_LEDS_EFFECT_KEYUNMUTE;
+	}
+
+	do_ctrl_event(cmd);
+}
+EXPORT_SYMBOL_GPL(aw9818_mic_key_handler);
+
 /*
  *loop waitting "start compete sigal" from userspace !
  */
 static void aw9818_startup(void)
 {
-	ledeffect_info *p_led_effect = get_led_effect();
 	unsigned long cmd = AW9818_LEDS_EFFECT_STARTUP;
 
-	if (NULL != p_led_effect) {
-		do_ctrl_event(cmd);
-	}
-
+	do_ctrl_event(cmd);
 }
 
 static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
