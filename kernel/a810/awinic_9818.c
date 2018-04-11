@@ -212,6 +212,7 @@ typedef struct {
 	byte bright_level;
 	ledcolor_info background;
 	ledcolor_info foward;
+	bool is_mute;
 } ledeffect_info;
 ledeffect_info *led_effect = NULL;
 
@@ -699,8 +700,8 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 	while (true) {
 		p_led_effect = get_led_effect();
 		if (NULL != p_led_effect) {
-			down(&g_aw9818->condition_lock);
 			wait_event_interruptible(data->notify_led_event, g_aw9818->wait_condtion == true || kthread_should_stop());	//FIXME case is 1:interrup coming
+			down(&g_aw9818->condition_lock);
 			g_aw9818->wait_condtion = false;
 			g_aw9818->led_thread_sleep = false;
 			g_aw9818->led_thread_running = LED_THREAD_ACTIVE;
@@ -743,16 +744,19 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 				break;
 			}
 
-			//TODO if keymute; set color
-#if 0
-			if () {
-				//mute color
-			} else {
-				//close
+			// if keymute; recover mute-color
+			if (p_led_effect->state != AW9818_LEDS_EFFECT_KEYMUTE) {
+				if (p_led_effect->is_mute) {
+					//mute color
+					led_effect_keymute();
+				} else {
+					//close
+					led_effect_close();
+				}
 			}
-#endif
 			//set current status inactive
 			g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
+			//FIXME set_current_state ? ctrl_event to process this status !
 			g_aw9818->led_thread_sleep = true;
 		}
 
@@ -766,6 +770,7 @@ static void led_init(void)
 	ledeffect_info_init();
 	led_default_setup();
 	mutex_init(&g_aw9818->effect_lock);
+	sema_init(&g_aw9818->condition_lock, 1);
 
 	init_waitqueue_head(&g_aw9818->notify_led_event);
 	g_aw9818->led_cntrl_threadid = kthread_run((int (*)(void *))led_event_cntrl_thread, g_aw9818, "led_control_thread");
@@ -788,9 +793,11 @@ static void do_ctrl_event(unsigned long cmd)
 {
 	ledeffect_info *p_led_effect = get_led_effect();
 	if (NULL != p_led_effect) {
+		//FIXME  down up的作用
 		down(&g_aw9818->condition_lock);
 		p_led_effect->state = cmd;
-		//TODO halt current thread
+		/****** FIXME ******/
+		//halt current thread
 		if (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
 			g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
 		}
@@ -867,11 +874,11 @@ static int aw9818_setup_cdev(struct aw9818_priv *data)
 	return 0;
 }
 
-void aw9818_mic_key_handler(bool state)
+void aw9818_mic_key_handler(bool ismute)
 {
 	unsigned long cmd;
 
-	if (state == true) {
+	if (ismute == true) {
 		cmd = AW9818_LEDS_EFFECT_KEYMUTE;
 	} else {
 		cmd = AW9818_LEDS_EFFECT_KEYUNMUTE;
@@ -879,6 +886,7 @@ void aw9818_mic_key_handler(bool state)
 
 	do_ctrl_event(cmd);
 }
+
 EXPORT_SYMBOL_GPL(aw9818_mic_key_handler);
 
 /*
