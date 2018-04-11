@@ -27,6 +27,10 @@
 #include <linux/semaphore.h>
 #include <linux/sched.h>
 #include <linux/string.h>
+#include <linux/wait.h>
+#include <linux/proc_fs.h>
+#include <linux/sched.h>
+#include <linux/kthread.h>
 
 #define AW9818_DEBUG
 
@@ -43,15 +47,23 @@
 #define AW9818_CHANNEL	2	//meaning use i2c-2, other i2c-0 i2c-1
 #define LED_CHIP_NUMS   2	//2 aw9818 chips
 
+typedef enum {
+	LED_THREAD_ACTIVE = 0,
+	LED_THREAD_INACTIVE,
+} LED_THREAD_STATUS;
+
 struct aw9818_priv {
 	struct i2c_client *i2c_cli[LED_CHIP_NUMS];	//i2c_cli[0]-->aw9818_1, i2c_cli[1]-->aw9818_2
 	struct cdev cdev;
 	dev_t devno;
 	struct class *class;
 	struct device *device;
-	struct workqueue_struct *wqueue;
-	struct work_struct work_startup;
 	struct mutex effect_lock;
+	wait_queue_head_t notify_led_event;
+	struct task_struct *led_cntrl_threadid;
+	struct semaphore condition_lock;
+	LED_THREAD_STATUS led_thread_running;
+	bool wait_condtion, led_thread_sleep;
 };
 
 struct aw9818_priv *g_aw9818 = NULL;
@@ -77,9 +89,10 @@ typedef enum {
 	LEDS_EFFECT_COLOR_CHANGE,
 	LEDS_EFFECT_IMAX_CHANGE,
 	LEDS_EFFECT_TOTAL
-} APP_LED_EFFECT_ENUM;
+} LED_EFFECT_ENUM;
 
 #define AW9818_IOC_MAGIC 'm'	//定义类型
+#define AW9818_LEDS_EFFECT_STARTUP			_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_STARTUP, int)
 #define AW9818_LEDS_EFFECT_COMPLETE			_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_COMPLETE, int)
 #define AW9818_LEDS_EFFECT_AIRKISS_MODE		_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_AIRKISS_MODE, int)
 #define AW9818_LEDS_EFFECT_AIRKISS_CONFIG	_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_AIRKISS_CONFIG, int)
@@ -90,8 +103,6 @@ typedef enum {
 #define AW9818_LEDS_EFFECT_KEYMUTE		    _IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_KEYMUTE, int)
 #define AW9818_LEDS_EFFECT_KEYUNMUTE		_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_KEYUNMUTE, int)
 #endif
-
-static byte state_change = 1;
 
 //bright value
 typedef struct {
@@ -188,9 +199,16 @@ typedef enum {
 	LED_MAX_COLOR
 } LED_COLOR;
 
+typedef enum {
+	DIRECTION_A = 0,
+	DIRECTION_B,
+} LED_VOICE_DIRECTION;
+
 //TODO extendibility
 typedef struct {
 	byte cur_idx;
+	LED_VOICE_DIRECTION direction;
+	int state;
 	byte bright_level;
 	ledcolor_info background;
 	ledcolor_info foward;
@@ -489,14 +507,6 @@ static void led_default_setup(void)
 	aw981x_enable_chip();
 }
 
-static void led_init(void)
-{
-	ledif_info_init();
-	ledeffect_info_init();
-	led_default_setup();
-	mutex_init(&g_aw9818->effect_lock);
-}
-
 /*
  *
  *所有的灯关闭，但保持芯片处于工作状态
@@ -514,16 +524,6 @@ static void led_effect_close(void)
 	led_set_all_bright_color(bright_level, background);
 
 	aw981x_enable_chip();
-}
-
-static int aw9818_open(struct inode *inode, struct file *filp)
-{
-	struct aw9818_priv *aw9818 = container_of(inode->i_cdev,
-						  struct aw9818_priv, cdev);
-
-	filp->private_data = aw9818;
-
-	return 0;
 }
 
 static void effect_comet_set(byte cur_idx, const ledcolor_info background, const ledcolor_info foward)
@@ -545,7 +545,7 @@ static void effect_comet_set(byte cur_idx, const ledcolor_info background, const
  *
  * 一圈浅蓝色的灯亮起，浅红色的灯以 彗星 模式转动
  */
-static void led_effect_startup(struct work_struct *ws)
+static void led_effect_startup(void)
 {
 	ledcolor_info background, foward;
 
@@ -557,7 +557,7 @@ static void led_effect_startup(struct work_struct *ws)
 		foward = led_colors[purple];
 		p_led_effect->cur_idx = 0;
 
-		while (state_change) {
+		while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
 			effect_comet_set(p_led_effect->cur_idx, background, foward);
 			//enable
 			aw981x_enable_chip();
@@ -584,7 +584,7 @@ static void led_effect_complete(void)
 		foward = led_colors[blue];
 		p_led_effect->cur_idx = 0;
 
-		while (state_change) {
+		while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
 			effect_comet_set(p_led_effect->cur_idx, background, foward);
 			//enable
 			aw981x_enable_chip();
@@ -605,7 +605,7 @@ void led_effect_airkiss_mode(void)
 	ledcolor_info background;
 	pr_err("%s\n", __func__);
 
-	bright_level =  led_bright_level[BRIGHT_MAX];
+	bright_level = led_bright_level[BRIGHT_MAX];
 	background = led_colors[orange];
 	led_set_all_bright_color(bright_level, background);
 
@@ -628,7 +628,7 @@ void led_effect_airkiss_config(void)
 		foward = led_colors[yellow];
 		p_led_effect->cur_idx = 0;
 
-		while (state_change) {
+		while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
 			effect_comet_set(p_led_effect->cur_idx, background, foward);
 			//enable
 			aw981x_enable_chip();
@@ -689,51 +689,137 @@ static void led_effect_keymute(void)
  */
 static void led_effect_keyunmute(void)
 {
+	;
+}
+
+static void led_event_cntrl_thread(struct aw9818_priv *data)
+{
+	ledeffect_info *p_led_effect = NULL;
+
+	while (true) {
+		p_led_effect = get_led_effect();
+		if (NULL != p_led_effect) {
+			down(&g_aw9818->condition_lock);
+			wait_event_interruptible(data->notify_led_event, g_aw9818->wait_condtion == true || kthread_should_stop());	//FIXME case is 1:interrup coming
+			g_aw9818->wait_condtion = false;
+			g_aw9818->led_thread_running = LED_THREAD_ACTIVE;
+			up(&g_aw9818->condition_lock);
+
+			led_effect_close();
+			switch (p_led_effect->state) {
+			case AW9818_LEDS_EFFECT_STARTUP:
+				led_effect_startup();
+				break;
+			case AW9818_LEDS_EFFECT_COMPLETE:
+				led_effect_complete();
+				break;
+			case AW9818_LEDS_EFFECT_AIRKISS_MODE:
+				led_effect_airkiss_mode();
+				break;
+			case AW9818_LEDS_EFFECT_AIRKISS_CONFIG:
+				led_effect_airkiss_config();
+				break;
+			case AW9818_LEDS_EFFECT_AIRKISS_CONNECT:
+				led_effect_airkiss_connect();
+				break;
+			case AW9818_LEDS_EFFECT_WAKE_UP:
+				led_effect_wake_up(p_led_effect->direction);
+				break;
+			case AW9818_LEDS_EFFECT_COMMAND_FAIL:
+				led_effect_command_fail();
+				break;
+			case AW9818_LEDS_EFFECT_COMMAND_SUCCESS:
+				led_effect_command_success();
+				break;
+			case AW9818_LEDS_EFFECT_KEYMUTE:
+				led_effect_keymute();
+				//do not use a driver interrupt, use keyevent is nice, and the mute should get key-code in keyboard.c
+				break;
+			case AW9818_LEDS_EFFECT_KEYUNMUTE:
+				led_effect_keyunmute();
+				break;
+			default:
+				break;
+			}
+
+			//TODO if keymute; set color
+#if 0
+			if () {
+				//mute color
+			} else {
+				//close
+			}
+#endif
+			//set current status inactive
+			g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
+			g_aw9818->led_thread_sleep = true;
+		}
+
+	}
+
+}
+
+static void led_init(void)
+{
+	ledif_info_init();
+	ledeffect_info_init();
+	led_default_setup();
+	mutex_init(&g_aw9818->effect_lock);
+
+	init_waitqueue_head(&g_aw9818->notify_led_event);
+	g_aw9818->led_cntrl_threadid = kthread_run((int (*)(void *))led_event_cntrl_thread, g_aw9818, "led_control_thread");
+	if (IS_ERR(g_aw9818->led_cntrl_threadid)) {
+		AW9818_DEBUGP("Not able to spawn Kernel Thread\n");
+	}
+}
+
+static int aw9818_open(struct inode *inode, struct file *filp)
+{
+	struct aw9818_priv *aw9818 = container_of(inode->i_cdev,
+						  struct aw9818_priv, cdev);
+
+	filp->private_data = aw9818;
+
+	return 0;
+}
+
+static void do_ctrl_event(unsigned long cmd)
+{
+	ledeffect_info *p_led_effect = get_led_effect();
+	if (NULL != p_led_effect) {
+		down(&g_aw9818->condition_lock);
+		p_led_effect->state = cmd;
+		//TODO halt current thread
+		if (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
+			g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
+		}
+		g_aw9818->wait_condtion = true;
+		up(&g_aw9818->condition_lock);
+
+		//wait running event over
+		mdelay(100);
+		while (true) {
+			if (g_aw9818->led_thread_sleep == true) {
+				wake_up(&g_aw9818->notify_led_event);
+				break;
+			}
+		}
+	}
 
 }
 
 /*
  *
- *eg: a signal like "startup-complete"; 2.做好互斥
+ *eg: a signal like "startup-complete"
  */
 static long aw9818_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	unsigned long udata;
-	state_change = 0;
-	led_effect_close();
 
-	get_user(udata, (unsigned long __user*)arg);
-	switch (cmd) {
-	case AW9818_LEDS_EFFECT_COMPLETE:
-		led_effect_complete();
-		break;
-	case AW9818_LEDS_EFFECT_AIRKISS_MODE:
-		led_effect_airkiss_mode();
-		break;
-	case AW9818_LEDS_EFFECT_AIRKISS_CONFIG:
-		led_effect_airkiss_config();
-		break;
-	case AW9818_LEDS_EFFECT_AIRKISS_CONNECT:
-		led_effect_airkiss_connect();
-		break;
-	case AW9818_LEDS_EFFECT_WAKE_UP:
-		led_effect_wake_up(udata);
-		break;
-	case AW9818_LEDS_EFFECT_COMMAND_FAIL:
-		led_effect_command_fail();
-		break;
-	case AW9818_LEDS_EFFECT_COMMAND_SUCCESS:
-		led_effect_command_success();
-		break;
-	case AW9818_LEDS_EFFECT_KEYMUTE:
-		led_effect_keymute();
-		//do not use a driver interrupt, use keyevent is nice, and the mute should get key-code in keyboard.c
-		break;
-	case AW9818_LEDS_EFFECT_KEYUNMUTE:
-		led_effect_keyunmute();
-		break;
-	default:
-		break;
+	ledeffect_info *p_led_effect = get_led_effect();
+	if (NULL != p_led_effect) {
+		get_user(p_led_effect->direction, (unsigned long __user *)arg);
+
+		do_ctrl_event(cmd);
 	}
 
 	return 0;
@@ -785,14 +871,13 @@ static int aw9818_setup_cdev(struct aw9818_priv *data)
  */
 static void aw9818_startup(void)
 {
-	struct aw9818_priv *awdata = g_aw9818;
+	ledeffect_info *p_led_effect = get_led_effect();
+	unsigned long cmd = AW9818_LEDS_EFFECT_STARTUP;
 
-	if (awdata) {
-		INIT_WORK(&awdata->work_startup, led_effect_startup);
-		if (!work_pending(&awdata->work_startup)) {
-			queue_work(awdata->wqueue, &awdata->work_startup);
-		}
+	if (NULL != p_led_effect) {
+		do_ctrl_event(cmd);
 	}
+
 }
 
 static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
