@@ -181,6 +181,8 @@ static const byte gamma_brightness[] = {
 	52, 54, 55, 57, 59, 61, 62, 63,	//83
 };
 
+static const byte gamma_levels = sizeof(gamma_brightness) / sizeof(byte);
+
 #define BRIGHT_MAX	6
 static const byte led_bright_level[BRIGHT_MAX] = {
 	10, 26, 42, 52, 60, 82,
@@ -302,8 +304,10 @@ static void set_ledif_info(ledif_info * ledif_info_struct)
 static void ledif_info_init(void)
 {
 	byte i, len;
-
 	ledif_info *ledif_info_struct = (ledif_info *) kmalloc(sizeof(ledif_info) * LED_CHIP_NUMS, GFP_KERNEL);
+
+	AW9818_DEBUGP("ledif_info_init\n");
+
 	if (NULL != ledif_info_struct) {
 		for (i = 0; i < LED_CHIP_NUMS; i++) {
 			ledif_info_struct[i].led_nums = get_led_nums(i);
@@ -340,8 +344,10 @@ static ledeffect_info *get_led_effect(void)
 static void ledeffect_info_init(void)
 {
 	ledeffect_info *ledeffect_info_struct = NULL;
-
 	ledeffect_info_struct = (ledeffect_info *) kmalloc(sizeof(ledeffect_info), GFP_KERNEL);
+
+	AW9818_DEBUGP("ledeffect_info_init\n");
+
 	if (ledeffect_info_struct) {
 		ledeffect_info_struct->cur_idx = 0;
 		ledeffect_info_struct->background = led_colors[none];
@@ -401,6 +407,7 @@ int aw9818_write(u8 reg, unsigned char value, struct i2c_client *client)
 
 static void aw981x_write_register(CHIP_ID chip_id, byte reg, byte data)
 {
+	AW9818_DEBUGP("aw981x_write_register\n");
 	pr_err("id 0x%x, reg 0x%x, data 0x%x\n", chip_id, reg, data);
 
 	aw9818_write(reg, data, g_aw9818->i2c_cli[chip_id]);
@@ -408,6 +415,7 @@ static void aw981x_write_register(CHIP_ID chip_id, byte reg, byte data)
 
 static byte convert_data(byte brightness, LED_COLOR_LEVEL color)
 {
+	AW9818_DEBUGP("convert_data\n");
 	switch (color) {
 	case LED_COLOR_NONE:
 		brightness &= 0;
@@ -429,6 +437,7 @@ static void led_update_data(byte led_index, ledreg_data * p_ledreg_data)
 {
 	const ledhw_info *p_ledhw_info = NULL;
 	const ledreg_data *lreg = NULL;
+	AW9818_DEBUGP("led_update_data\n");
 
 	//get regmap(r,g,b) and data(r,g,b)
 	if (led_index < get_led_nums(0)) {
@@ -448,6 +457,7 @@ static void led_set_bright_color(byte led_index, byte brightlevel, const ledcolo
 {
 	byte brightness;
 	ledif_info *ledif_info_struct = NULL;
+	AW9818_DEBUGP("led_set_bright_color\n");
 
 	if (led_index < get_led_nums(0)) {
 		ledif_info_struct = &led_intf[0];
@@ -486,6 +496,7 @@ static void led_set_all_bright_color(byte brightlevel, const ledcolor_info backg
 static void aw981x_enable_chip(void)
 {
 	byte aw981x_id;
+	AW9818_DEBUGP("aw981x_enable_chip\n");
 
 	for (aw981x_id = 0; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
 		// enable chip
@@ -496,7 +507,7 @@ static void aw981x_enable_chip(void)
 static void led_default_setup(void)
 {
 	byte aw981x_id;
-	pr_err("%s\n", __func__);
+	AW9818_DEBUGP("led_default_setup\n");
 
 	for (aw981x_id = 0; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
 		// reset chip
@@ -517,7 +528,7 @@ static void led_effect_close(void)
 	byte bright_level;
 	ledcolor_info background;
 
-	pr_err("%s\n", __func__);
+	AW9818_DEBUGP("led_effect_close\n");
 
 	background = led_colors[none];
 	bright_level = led_bright_level[BRIGHT_MAX];
@@ -530,6 +541,7 @@ static void led_effect_close(void)
 static void effect_comet_set(byte cur_idx, const ledcolor_info background, const ledcolor_info foward)
 {
 	byte i, comet_nums, back_brtlevel;
+	AW9818_DEBUGP("effect_comet_set\n");
 
 	comet_nums = sizeof(led_bright_level) / sizeof(led_bright_level[0]);
 
@@ -551,7 +563,7 @@ static void led_effect_startup(void)
 	ledcolor_info background, foward;
 
 	ledeffect_info *p_led_effect = get_led_effect();
-	pr_err("%s\n", __func__);
+	AW9818_DEBUGP("led_effect_startup\n");
 
 	if (NULL != p_led_effect) {
 		background = led_colors[indigo];
@@ -578,7 +590,7 @@ static void led_effect_complete(void)
 	ledcolor_info background, foward;
 
 	ledeffect_info *p_led_effect = get_led_effect();
-	pr_err("%s\n", __func__);
+	AW9818_DEBUGP("led_effect_complete\n");
 
 	if (NULL != p_led_effect) {
 		background = led_colors[white];
@@ -604,7 +616,7 @@ void led_effect_airkiss_mode(void)
 {
 	byte bright_level;
 	ledcolor_info background;
-	pr_err("%s\n", __func__);
+	AW9818_DEBUGP("led_effect_airkiss_mode\n");
 
 	bright_level = led_bright_level[BRIGHT_MAX];
 	background = led_colors[orange];
@@ -622,7 +634,7 @@ void led_effect_airkiss_config(void)
 	ledcolor_info background, foward;
 
 	ledeffect_info *p_led_effect = get_led_effect();
-	pr_err("%s\n", __func__);
+	AW9818_DEBUGP("led_effect_airkiss_config\n");
 
 	if (NULL != p_led_effect) {
 		background = led_colors[none];
@@ -645,7 +657,7 @@ void led_effect_airkiss_config(void)
  */
 static void led_effect_airkiss_connect(void)
 {
-	pr_err("already close\n");
+	AW9818_DEBUGP("led_effect_airkiss_connect\n");
 }
 
 /*
@@ -654,6 +666,7 @@ static void led_effect_airkiss_connect(void)
  */
 static void led_effect_wake_up(unsigned long direction)
 {
+	AW9818_DEBUGP("led_effect_wake_up\n");
 
 }
 
@@ -663,6 +676,7 @@ static void led_effect_wake_up(unsigned long direction)
  */
 static void led_effect_command_fail(void)
 {
+	AW9818_DEBUGP("led_effect_command_fail\n");
 
 }
 
@@ -672,6 +686,42 @@ static void led_effect_command_fail(void)
  */
 static void led_effect_command_success(void)
 {
+	ledeffect_info *p_led_effect = get_led_effect();
+	ledcolor_info color;
+	byte bright_idx, color_idx, brightness;
+
+	ledcolor_info breath_colors[] = {
+		led_colors[blue],
+		led_colors[indigo],
+	};
+	byte max_idx = 2 * gamma_levels;
+
+	AW9818_DEBUGP("led_effect_command_success\n");
+
+	if (NULL != p_led_effect) {
+		p_led_effect->cur_idx = 0;
+
+		while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
+			// use p_led_effect->cur_idx to calculate brightness and color
+			bright_idx = p_led_effect->cur_idx % max_idx;
+			color_idx = p_led_effect->cur_idx / max_idx;
+			color = breath_colors[color_idx];
+
+			if (bright_idx < gamma_levels) {
+				brightness = gamma_brightness[bright_idx];
+			} else {
+				brightness = gamma_brightness[max_idx - bright_idx - 1];
+			}
+
+			// light up leds
+			led_set_all_bright_color(brightness, color);
+			aw981x_enable_chip();
+			msleep(50);
+
+			p_led_effect->cur_idx++;
+			p_led_effect->cur_idx %= max_idx;
+		}
+	}
 
 }
 
@@ -696,6 +746,9 @@ static void led_effect_keyunmute(void)
 static void led_event_cntrl_thread(struct aw9818_priv *data)
 {
 	ledeffect_info *p_led_effect = NULL;
+	g_aw9818->wait_condtion = false;
+	g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
+	g_aw9818->led_thread_sleep = true;
 
 	while (true) {
 		p_led_effect = get_led_effect();
@@ -734,10 +787,11 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 				led_effect_command_success();
 				break;
 			case AW9818_LEDS_EFFECT_KEYMUTE:
+				p_led_effect->is_mute = true;
 				led_effect_keymute();
-				//do not use a driver interrupt, use keyevent is nice, and the mute should get key-code in keyboard.c
 				break;
 			case AW9818_LEDS_EFFECT_KEYUNMUTE:
+				p_led_effect->is_mute = false;
 				led_effect_keyunmute();
 				break;
 			default:
@@ -775,7 +829,7 @@ static void led_init(void)
 	init_waitqueue_head(&g_aw9818->notify_led_event);
 	g_aw9818->led_cntrl_threadid = kthread_run((int (*)(void *))led_event_cntrl_thread, g_aw9818, "led_control_thread");
 	if (IS_ERR(g_aw9818->led_cntrl_threadid)) {
-		AW9818_DEBUGP("Not able to spawn Kernel Thread\n");
+		AW9818_DEBUGP("Not able to spawn kernel thread\n");
 	}
 }
 
@@ -793,10 +847,8 @@ static void do_ctrl_event(unsigned long cmd)
 {
 	ledeffect_info *p_led_effect = get_led_effect();
 	if (NULL != p_led_effect) {
-		//FIXME  down up的作用
 		down(&g_aw9818->condition_lock);
 		p_led_effect->state = cmd;
-		/****** FIXME ******/
 		//halt current thread
 		if (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
 			g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
@@ -804,10 +856,10 @@ static void do_ctrl_event(unsigned long cmd)
 		g_aw9818->wait_condtion = true;
 		up(&g_aw9818->condition_lock);
 
-		//wait running event over
-		mdelay(50);
+		//wait led_thread_running status is TASK_UNINTERRUPTIBLE
 		while (true) {
 			if (g_aw9818->led_thread_sleep == true) {
+				mdelay(50);
 				wake_up(&g_aw9818->notify_led_event);
 				break;
 			}
