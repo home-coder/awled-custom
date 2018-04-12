@@ -209,7 +209,7 @@ typedef enum {
 //TODO extendibility
 typedef struct {
 	byte cur_idx;
-	LED_VOICE_DIRECTION direction;
+	LED_VOICE_DIRECTION orientation;
 	int state;
 	byte bright_level;
 	ledcolor_info background;
@@ -662,9 +662,9 @@ static void led_effect_airkiss_connect(void)
 
 /*
  *
- * 一圈蓝色灯亮起，发声方向处变为白色
+ * 一圈蓝色灯亮起，发声方向处(0 ~ 360)变为白色
  */
-static void led_effect_wake_up(unsigned long direction)
+static void led_effect_wake_up(unsigned long orientation)
 {
 	AW9818_DEBUGP("led_effect_wake_up\n");
 
@@ -701,6 +701,7 @@ static void led_effect_command_success(void)
 	if (NULL != p_led_effect) {
 		p_led_effect->cur_idx = 0;
 
+		//FIXME timeout退出
 		while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
 			// use p_led_effect->cur_idx to calculate brightness and color
 			bright_idx = p_led_effect->cur_idx % max_idx;
@@ -778,7 +779,7 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 				led_effect_airkiss_connect();
 				break;
 			case AW9818_LEDS_EFFECT_WAKE_UP:
-				led_effect_wake_up(p_led_effect->direction);
+				led_effect_wake_up(p_led_effect->orientation);
 				break;
 			case AW9818_LEDS_EFFECT_COMMAND_FAIL:
 				led_effect_command_fail();
@@ -808,9 +809,10 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 					led_effect_close();
 				}
 			}
-			//set current status inactive
+
+			//set current state inactive
 			g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
-			//FIXME set_current_state ? ctrl_event to process this status !
+
 			g_aw9818->led_thread_sleep = true;
 		}
 
@@ -877,7 +879,7 @@ static long aw9818_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned 
 
 	ledeffect_info *p_led_effect = get_led_effect();
 	if (NULL != p_led_effect) {
-		get_user(p_led_effect->direction, (unsigned long __user *)arg);
+		get_user(p_led_effect->orientation, (unsigned long __user *)arg);
 
 		do_ctrl_event(cmd);
 	}
