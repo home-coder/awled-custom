@@ -874,7 +874,7 @@ static void do_ctrl_event(unsigned long cmd)
  *
  *eg: a signal like "startup-complete"
  */
-static long aw9818_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+static long aw9818_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)//FIXME if not only orientation, it should be a struct
 {
 
 	ledeffect_info *p_led_effect = get_led_effect();
