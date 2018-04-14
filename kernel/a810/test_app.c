@@ -107,7 +107,9 @@ int main()
 				ret = ioctl(fd, AW9818_LEDS_EFFECT_AIRKISS_CONNECT, NULL);
 				break;
 			case 'g':
-				ret = ioctl(fd, AW9818_LEDS_EFFECT_WAKE_UP, NULL);
+				printf("input a oreitation:");
+				cmd = getchar();
+				ret = ioctl(fd, AW9818_LEDS_EFFECT_WAKE_UP, cmd);
 				break;
 			case 'h':
 				ret = ioctl(fd, AW9818_LEDS_EFFECT_COMMAND_FAIL, NULL);
