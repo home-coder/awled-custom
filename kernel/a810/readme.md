@@ -48,11 +48,11 @@ id sem consectetuer libero luctus adipiscing.
 ### 2.效果的实现
 + **Question-1**
 内核中实现：
-每次ioctl传入cmd=LEDS_EFFECT_WAKE_UP和参数arg=direction1
-会唤醒wake_up一个阻塞的进程wait_event_interruptible(),
-然后根据direction去实现当前角度的灯光闪烁5次
-期间如果有其他的事件如又ioctl传入另外一个方向
-direction2就打断当前的闪烁并重现根据direction2去实现灯光闪烁5次
+每次ioctl传入cmd=LEDS_EFFECT_WAKE_UP和参数arg=direction1  
+会唤醒wake_up一个阻塞的进程wait_event_interruptible(),  
+然后根据direction去实现当前角度的灯光闪烁5次  
+期间如果有其他的事件如又ioctl传入另外一个方向  
+direction2就打断当前的闪烁并重现根据direction2去实现灯光闪烁5次  
 + **Question-2**
 todolist:  kthread_should_stop是什么 ?
 + **Question-3**
