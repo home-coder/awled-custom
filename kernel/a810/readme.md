@@ -57,7 +57,7 @@ direction2就打断当前的闪烁并重现根据direction2去实现灯光闪烁
 todolist:  kthread_should_stop是什么 ?
 + **Question-3**
 当前设计：
-this is an example [helloworld](https://github.com/home-coder/awled-custom/项目周期.pdf)
+this is an example [helloworld](https://github.com/home-coder/awled-custom/tree/master/kernel/a810/../../../项目周期.pdf)
 See my [About](../../) page for details.
 This is [an example](http://example.com/ "Title") inline link.
 
