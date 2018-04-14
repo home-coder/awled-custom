@@ -8,9 +8,8 @@
 ---
 ### 1.机制的实现
 重新整理led_effect结构体定义,
-要不要使用stack
-<http://example.com/>
-
+要不要使用stack  
+<http://example.com/>  
 https://www.appinn.com/markdown/
 
 `具体代码如下`
