@@ -58,6 +58,7 @@ todolist:  kthread_should_stop是什么 ?
 + **Question-3**
 当前设计：
 this is an example [helloworld](../../项目周期.pdf)
+See my [About](../../项目周期.pdf) page for details.
 This is [an example](http://example.com/ "Title") inline link.
 
 [This link](http://example.net/) has no title attribute.
