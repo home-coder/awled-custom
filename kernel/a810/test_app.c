@@ -53,7 +53,8 @@ int main()
 {
 	int fd, ret = -1;
 	char cmd;
-#if 0	
+	char oreitation[32];
+#if 1
 	fd = open(DEV_NAME, O_RDWR);
 	if (fd < 0) {
 		printf("open failed\n");
@@ -79,7 +80,7 @@ int main()
 				"o			LEDS_EFFECT_TOTAL \n"
 				"===============================================================================================\n\n");
 		printf("please input test case:");
-		cmd = getchar();
+		scanf("%c", &cmd);
 		getchar();
 		//printf("%c", cmd);
 		if (cmd == 'q') {
@@ -108,8 +109,9 @@ int main()
 				break;
 			case 'g':
 				printf("input a oreitation:");
-				cmd = getchar();
-				ret = ioctl(fd, AW9818_LEDS_EFFECT_WAKE_UP, cmd);
+				scanf("%s", &oreitation);
+				getchar();
+				ret = ioctl(fd, AW9818_LEDS_EFFECT_WAKE_UP, oreitation);
 				break;
 			case 'h':
 				ret = ioctl(fd, AW9818_LEDS_EFFECT_COMMAND_FAIL, NULL);

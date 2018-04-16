@@ -75,23 +75,23 @@ typedef unsigned char byte;
 #ifdef IOCTL			//same as app
 typedef enum {
 	LEDS_EFFECT_NONE = 0,
-	LEDS_EFFECT_STARTUP,	/*board power on */
-	LEDS_EFFECT_COMPLETE,	/*board startup over */
-	LEDS_EFFECT_AIRKISS_MODE,	/*in airkiss mode */
-	LEDS_EFFECT_AIRKISS_CONFIG,	/*config airkiss */
-	LEDS_EFFECT_AIRKISS_CONNECT,	/*airkiss connected */
-	LEDS_EFFECT_WAKE_UP,	/*voice wake up */
-	LEDS_EFFECT_COMMAND_FAIL,	/*voice command failed */
-	LEDS_EFFECT_COMMAND_SUCCESS,	/*voice command success */
-	LEDS_EFFECT_KEYMUTE,	/*key mute record */
-	LEDS_EFFECT_KEYUNMUTE,	/*key cancel mute record */
+	LEDS_EFFECT_STARTUP,					/*board power on */
+	LEDS_EFFECT_COMPLETE,					/*board startup over */
+	LEDS_EFFECT_AIRKISS_MODE,				/*in airkiss mode */
+	LEDS_EFFECT_AIRKISS_CONFIG,				/*config airkiss */
+	LEDS_EFFECT_AIRKISS_CONNECT,			/*airkiss connected */
+	LEDS_EFFECT_WAKE_UP,					/*voice wake up */
+	LEDS_EFFECT_COMMAND_FAIL,				/*voice command failed */
+	LEDS_EFFECT_COMMAND_SUCCESS,			/*voice command success */
+	LEDS_EFFECT_KEYMUTE,					/*key mute record */
+	LEDS_EFFECT_KEYUNMUTE,					/*key cancel mute record */
 	LEDS_EFFECT_BRIGHT_CHANGE,
 	LEDS_EFFECT_COLOR_CHANGE,
 	LEDS_EFFECT_IMAX_CHANGE,
 	LEDS_EFFECT_TOTAL
 } LED_EFFECT_ENUM;
 
-#define AW9818_IOC_MAGIC 'm'	//定义类型
+#define AW9818_IOC_MAGIC 'm'
 #define AW9818_LEDS_EFFECT_STARTUP			_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_STARTUP, int)
 #define AW9818_LEDS_EFFECT_COMPLETE			_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_COMPLETE, int)
 #define AW9818_LEDS_EFFECT_AIRKISS_MODE		_IOW(AW9818_IOC_MAGIC, LEDS_EFFECT_AIRKISS_MODE, int)
@@ -171,9 +171,9 @@ static const byte aw981x_update_value = 0x01;
 static const byte gamma_brightness[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	//9
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	//19
-	1, 1, 1, 1, 2, 2, 2, 3,	//27
-	3, 3, 4, 4, 4, 5, 5, 5,	//35
-	6, 6, 7, 7, 8, 9, 10, 11,	//43
+	1, 1, 1, 1, 2, 2, 2, 3,			//27
+	3, 3, 4, 4, 4, 5, 5, 5,			//35
+	6, 6, 7, 7, 8, 9, 10, 11,		//43
 	11, 12, 13, 14, 15, 16, 17, 18,	//51
 	19, 20, 21, 22, 23, 24, 26, 27,	//59
 	28, 29, 31, 32, 33, 35, 36, 38,	//67
@@ -219,12 +219,12 @@ typedef struct {
 ledeffect_info *led_effect = NULL;
 
 const ledcolor_info led_colors[LED_MAX_COLOR] = {
-	{LED_COLOR_NONE, LED_COLOR_NONE, LED_COLOR_NONE},	// none
-	{LED_COLOR_FULL, LED_COLOR_NONE, LED_COLOR_NONE},	// red
-	{LED_COLOR_FULL, LED_COLOR_HALF, LED_COLOR_NONE},	// orange
-	{LED_COLOR_FULL, LED_COLOR_FULL, LED_COLOR_NONE},	// yellow
-	{LED_COLOR_NONE, LED_COLOR_FULL, LED_COLOR_NONE},	// green
-	{LED_COLOR_NONE, LED_COLOR_NONE, LED_COLOR_FULL},	// blue
+	{LED_COLOR_NONE, LED_COLOR_NONE, LED_COLOR_NONE},	//none
+	{LED_COLOR_FULL, LED_COLOR_NONE, LED_COLOR_NONE},	//red
+	{LED_COLOR_FULL, LED_COLOR_HALF, LED_COLOR_NONE},	//orange
+	{LED_COLOR_FULL, LED_COLOR_FULL, LED_COLOR_NONE},	//yellow
+	{LED_COLOR_NONE, LED_COLOR_FULL, LED_COLOR_NONE},	//green
+	{LED_COLOR_NONE, LED_COLOR_NONE, LED_COLOR_FULL},	//blue
 	{LED_COLOR_NONE, LED_COLOR_FULL, LED_COLOR_FULL},	//indigo
 	{LED_COLOR_FULL, LED_COLOR_NONE, LED_COLOR_FULL},	//purple
 	{LED_COLOR_FULL, LED_COLOR_FULL, LED_COLOR_FULL},	//white
@@ -468,7 +468,6 @@ static void led_set_bright_color(byte led_index, byte brightlevel, const ledcolo
 	//get brightness by level
 	brightness = gamma_brightness[brightlevel];
 
-	mutex_lock(&g_aw9818->effect_lock);
 	if (NULL != ledif_info_struct && NULL != ledif_info_struct->p_ledreg_data) {
 		ledif_info_struct->p_ledreg_data->r = convert_data(brightness, color.r);
 		ledif_info_struct->p_ledreg_data->g = convert_data(brightness, color.g);
@@ -478,7 +477,6 @@ static void led_set_bright_color(byte led_index, byte brightlevel, const ledcolo
 	} else if (ledif_info_struct == NULL) {
 		pr_err("some struct is NULL\n");
 	}
-	mutex_unlock(&g_aw9818->effect_lock);
 
 }
 
@@ -545,7 +543,7 @@ static void effect_comet_set(byte cur_idx, const ledcolor_info background, const
 
 	comet_nums = sizeof(led_bright_level) / sizeof(led_bright_level[0]);
 
-	back_brtlevel = led_bright_level[comet_nums - 1];	//故意设置背景色比comet最大值暗一些
+	back_brtlevel = led_bright_level[comet_nums - 1];	//故意设置背景色比comet最大值暗一些,好看
 	//set all background
 	led_set_all_bright_color(back_brtlevel, background);
 	//set comet
@@ -759,7 +757,6 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 			g_aw9818->wait_condtion = false;
 			g_aw9818->led_thread_sleep = false;
 			g_aw9818->led_thread_running = LED_THREAD_ACTIVE;
-			up(&g_aw9818->condition_lock);
 
 			led_effect_close();
 			switch (p_led_effect->state) {
@@ -814,6 +811,8 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 			g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
 
 			g_aw9818->led_thread_sleep = true;
+
+			up(&g_aw9818->condition_lock);
 		}
 
 	}
@@ -840,7 +839,7 @@ static int aw9818_open(struct inode *inode, struct file *filp)
 	struct aw9818_priv *aw9818 = container_of(inode->i_cdev,
 						  struct aw9818_priv, cdev);
 
-	filp->private_data = aw9818;
+	filp->private_data = aw9818;//unuse, we use global g_aw9818
 
 	return 0;
 }
@@ -848,24 +847,30 @@ static int aw9818_open(struct inode *inode, struct file *filp)
 static void do_ctrl_event(unsigned long cmd)
 {
 	ledeffect_info *p_led_effect = get_led_effect();
+	byte timeout = 4;
 	if (NULL != p_led_effect) {
-		down(&g_aw9818->condition_lock);
+		mutex_lock(&g_aw9818->effect_lock);
 		p_led_effect->state = cmd;
-		//halt current thread
+		//halt current "led_control_thread"
 		if (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
 			g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
 		}
 		g_aw9818->wait_condtion = true;
-		up(&g_aw9818->condition_lock);
 
-		//wait led_thread_running status is TASK_UNINTERRUPTIBLE
 		while (true) {
-			if (g_aw9818->led_thread_sleep == true) {
+			if (g_aw9818->led_thread_sleep == true) { //waiting "led_control_thread" status is TASK_UNINTERRUPTIBLE(also meaning thread is sleep)
 				mdelay(50);
 				wake_up(&g_aw9818->notify_led_event);
 				break;
+			} else { //if "led_control_thread" is running, should break loop waiting
+				if (timeout--) {
+					mdelay(50);
+				} else {
+					break;
+				}
 			}
 		}
+		mutex_unlock(&g_aw9818->effect_lock);
 	}
 
 }
