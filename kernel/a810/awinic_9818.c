@@ -216,7 +216,7 @@ typedef struct {
 } ledeffect_info;
 ledeffect_info *led_effect = NULL;
 
-const ledcolor_info led_colors[LED_MAX_COLOR] = {
+static const ledcolor_info led_colors[LED_MAX_COLOR] = {
 	{LED_COLOR_NONE, LED_COLOR_NONE, LED_COLOR_NONE},	//none
 	{LED_COLOR_FULL, LED_COLOR_NONE, LED_COLOR_NONE},	//red
 	{LED_COLOR_FULL, LED_COLOR_HALF, LED_COLOR_NONE},	//orange
@@ -228,7 +228,7 @@ const ledcolor_info led_colors[LED_MAX_COLOR] = {
 	{LED_COLOR_FULL, LED_COLOR_FULL, LED_COLOR_FULL},	//white
 };
 
-const ledreg_data ledreg_map_9818_1[] = {
+static const ledreg_data ledreg_map_9818_1[] = {
 	{0x1, 0x2, 0x3},
 	{0x5, 0x6, 0x7},
 	{0x1, 0x2, 0x3},
@@ -249,7 +249,7 @@ const ledreg_data ledreg_map_9818_1[] = {
 	{0x5, 0x6, 0x7},
 };
 
-const ledreg_data ledreg_map_9818_2[] = {
+static const ledreg_data ledreg_map_9818_2[] = {
 	{0x9, 0x8, 0x7},
 	{0x5, 0x4, 0x3},
 	{0x9, 0x8, 0x7},
@@ -270,7 +270,7 @@ const ledreg_data ledreg_map_9818_2[] = {
 	{0x5, 0x4, 0x3},
 };
 
-const ledhw_info ledhw_info_struct[LED_CHIP_NUMS] = {
+static const ledhw_info ledhw_info_struct[LED_CHIP_NUMS] = {
 	{
 	 AW9818_1,
 	 18,
@@ -400,7 +400,7 @@ static void aw981x_read_register(CHIP_ID chip_id, byte reg, byte * data)
 
 }
 
-int aw9818_write(u8 reg, unsigned char value, struct i2c_client *client)
+static int aw9818_write(u8 reg, unsigned char value, struct i2c_client *client)
 {
 	int ret = 0;
 	u8 write_cmd[2] = { 0 };
@@ -637,7 +637,7 @@ static void led_effect_complete(void)
  *
  * 一圈橙色的灯亮起
  */
-void led_effect_airkiss_mode(void)
+static void led_effect_airkiss_mode(void)
 {
 	byte bright_level;
 	ledcolor_info background;
@@ -654,7 +654,7 @@ void led_effect_airkiss_mode(void)
  *
  * 浅黄色的灯以 彗星 模式转动
  */
-void led_effect_airkiss_config(void)
+static void led_effect_airkiss_config(void)
 {
 	ledcolor_info background, foward;
 
@@ -773,6 +773,8 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 
 	while (true) {
 		p_led_effect = get_led_effect();
+
+		//here check validity, so every case no longer check again;
 		if (NULL != p_led_effect) {
 			wait_event_interruptible(data->notify_led_event, g_aw9818->wait_condtion == true || kthread_should_stop());
 			down(&g_aw9818->condition_lock);
@@ -839,12 +841,12 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 
 }
 
-static int led_init(void)
+static int aw9818_led_init(void)
 {
 	int ret = -1;
 	bool re = false;
 
-	AW9818_DEBUGP("led_init...\n");
+	AW9818_DEBUGP("aw9818_led_init...\n");
 	ret = ledif_info_init();
 	if (0 != ret) {
 		AW9818_DEBUGP("ledif_info_init failed\n");
@@ -893,7 +895,8 @@ static int aw9818_open(struct inode *inode, struct file *filp)
 static void do_ctrl_event(unsigned long cmd)
 {
 	ledeffect_info *p_led_effect = get_led_effect();
-	byte timeout = 4;
+	byte wait_led_thread_running = 4;
+
 	if (NULL != p_led_effect) {
 		mutex_lock(&g_aw9818->effect_lock);
 		p_led_effect->state = cmd;
@@ -903,15 +906,19 @@ static void do_ctrl_event(unsigned long cmd)
 		}
 		g_aw9818->wait_condtion = true;
 
+		//FIXME ---
 		while (true) {
 			if (g_aw9818->led_thread_sleep == true) {	//waiting "led_control_thread" status is TASK_UNINTERRUPTIBLE(also meaning thread is sleep)
 				mdelay(50);
 				wake_up(&g_aw9818->notify_led_event);
 				break;
-			} else {	//if "led_control_thread" is running, should break loop waiting
-				if (timeout--) {
+			} else {
+				if (wait_led_thread_running--) {
 					mdelay(50);
 				} else {
+					/*
+					 no matter "led_control_thread" is running or not, force break;
+					 */
 					break;
 				}
 			}
@@ -1035,9 +1042,9 @@ static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2
 
 	if (id->driver_data == 1) {	//all chips probe, then call function
 		data->i2c_cli[1] = client;
-		ret = led_init();
+		ret = aw9818_led_init();
 		if (0 != ret) {
-			AW9818_DEBUGP("led_init failed\n");
+			AW9818_DEBUGP("aw9818_led_init failed\n");
 			goto fail1;
 		}
 		ret = aw9818_setup_cdev(data);
