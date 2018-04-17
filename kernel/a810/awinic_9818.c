@@ -33,7 +33,6 @@
 #include <linux/kthread.h>
 
 #define AW9818_DEBUG
-
 #ifdef AW9818_DEBUG
 #define AW9818_DEBUGP(...)        printk(__VA_ARGS__)
 #else
@@ -42,7 +41,7 @@
 
 #define DEV_MAJOR   0		// meaning major is not set
 #define DEV_MINOR   0		//meaning set minor to be 0
-#define DEV_NAME    "xlj-aw9818"
+#define DEV_NAME    "xlj-aw9818"	//node "/dev/xlj-aw9818"
 
 #define AW9818_CHANNEL	2	//meaning use i2c-2, other i2c-0 i2c-1
 #define LED_CHIP_NUMS   2	//2 aw9818 chips
@@ -53,15 +52,17 @@ typedef enum {
 } LED_THREAD_STATUS;
 
 struct aw9818_priv {
+	/* dev */
 	struct i2c_client *i2c_cli[LED_CHIP_NUMS];	//i2c_cli[0]-->aw9818_1, i2c_cli[1]-->aw9818_2
 	struct cdev cdev;
 	dev_t devno;
 	struct class *class;
 	struct device *device;
+	/* thread */
 	struct mutex effect_lock;
+	struct semaphore condition_lock;
 	wait_queue_head_t notify_led_event;
 	struct task_struct *led_cntrl_threadid;
-	struct semaphore condition_lock;
 	LED_THREAD_STATUS led_thread_running;
 	bool wait_condtion, led_thread_sleep;
 };
@@ -326,6 +327,9 @@ static int ledif_info_init(void)
 				return -ENOMEM;
 			}
 		}
+	} else {
+		pr_err("ledif_info_struct kmalloc failed\n");
+		return -ENOMEM;
 	}
 
 	set_ledif_info(ledif_info_struct);
@@ -494,10 +498,10 @@ static void led_set_bright_color(byte led_index, byte brightlevel, const ledcolo
 
 static void led_set_all_bright_color(byte brightlevel, const ledcolor_info background)
 {
-	byte i;
+	byte i = 0;
 	byte led_nums = get_led_nums(0) + get_led_nums(1);
 
-	for (i = 0; i < led_nums; i++) {
+	for (; i < led_nums; i++) {
 		pr_err("led %u, led_set_bright_color\n", i);
 		led_set_bright_color(i, brightlevel, background);
 	}
@@ -505,10 +509,10 @@ static void led_set_all_bright_color(byte brightlevel, const ledcolor_info backg
 
 static void aw981x_enable_chip(void)
 {
-	byte aw981x_id;
+	byte aw981x_id = 0;
 	AW9818_DEBUGP("aw981x_enable_chip\n");
 
-	for (aw981x_id = 0; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
+	for (; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
 		// enable chip
 		aw981x_write_register(aw981x_id, aw981x_sleep_reg, aw981x_en_value);
 	}
@@ -767,9 +771,6 @@ static void led_effect_keyunmute(void)
 static void led_event_cntrl_thread(struct aw9818_priv *data)
 {
 	ledeffect_info *p_led_effect = NULL;
-	g_aw9818->wait_condtion = false;
-	g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
-	g_aw9818->led_thread_sleep = true;
 
 	while (true) {
 		p_led_effect = get_led_effect();
@@ -841,6 +842,21 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 
 }
 
+static int led_thread_init(void)
+{
+	init_waitqueue_head(&g_aw9818->notify_led_event);
+	g_aw9818->wait_condtion = false;
+	g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
+	g_aw9818->led_thread_sleep = true;
+
+	g_aw9818->led_cntrl_threadid = kthread_run((int (*)(void *))led_event_cntrl_thread, g_aw9818, "led_control_thread");
+	if (IS_ERR(g_aw9818->led_cntrl_threadid)) {
+		return -1;
+	}
+
+	return 0;
+}
+
 /*
  *
  *一些全局变量的初始化等...
@@ -871,9 +887,7 @@ static int aw9818_led_init(void)
 	//for waitqueue work
 	sema_init(&g_aw9818->condition_lock, 1);
 
-	init_waitqueue_head(&g_aw9818->notify_led_event);
-	g_aw9818->led_cntrl_threadid = kthread_run((int (*)(void *))led_event_cntrl_thread, g_aw9818, "led_control_thread");
-	if (IS_ERR(g_aw9818->led_cntrl_threadid)) {
+	if (0 != led_thread_init()) {
 		AW9818_DEBUGP("Not able to spawn kernel thread\n");
 		return -1;
 	}
@@ -894,7 +908,7 @@ static int aw9818_open(struct inode *inode, struct file *filp)
 static void do_ctrl_event(unsigned long cmd)
 {
 	ledeffect_info *p_led_effect = get_led_effect();
-	byte wait_led_thread_running = 4;
+	byte wait_led_thread_running = 4;	// the magic: 4*50ms
 
 	if (NULL != p_led_effect) {
 		mutex_lock(&g_aw9818->effect_lock);
@@ -933,8 +947,8 @@ static void do_ctrl_event(unsigned long cmd)
  */
 static long aw9818_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)	//FIXME if not only orientation, it should be a struct
 {
-
 	ledeffect_info *p_led_effect = get_led_effect();
+
 	if (NULL != p_led_effect) {
 		get_user(p_led_effect->orientation, (unsigned long __user *)arg);
 
@@ -959,12 +973,13 @@ static struct file_operations aw9818_fops = {
 /*
  *
  *this function is a typical cdev module
+ *uspace can get a dev file by sys class
  */
 static int aw9818_setup_cdev(struct aw9818_priv *data)
 {
 	int ret = -1;
-	static int dev_major = DEV_MAJOR;
-	static int dev_minor = DEV_MINOR;
+	const int dev_major = DEV_MAJOR;
+	const int dev_minor = DEV_MINOR;
 
 	data->devno = MKDEV(dev_major, dev_minor);
 	if (dev_major) {
@@ -972,18 +987,19 @@ static int aw9818_setup_cdev(struct aw9818_priv *data)
 	} else {
 		ret = alloc_chrdev_region(&data->devno, dev_minor, 1, DEV_NAME);
 	}
-
 	if (ret < 0) {
 		pr_err("register char dev failed\n");
 		goto fail1;
 	}
 
 	cdev_init(&data->cdev, &aw9818_fops);
+
 	ret = cdev_add(&data->cdev, data->devno, 1);
 	if (ret) {
 		pr_err("error add a char dev");
 		goto fail2;
 	}
+
 	data->class = class_create(THIS_MODULE, DEV_NAME);
 	data->device = device_create(data->class, NULL, data->devno, NULL, DEV_NAME);
 
@@ -1012,7 +1028,7 @@ void aw9818_mic_key_handler(bool ismute)
 EXPORT_SYMBOL_GPL(aw9818_mic_key_handler);
 
 /*
- *loop waitting "start compete sigal" from userspace !
+ *loop waitting "start compete sigal" from uspace !
  */
 static void aw9818_startup(void)
 {
@@ -1023,9 +1039,9 @@ static void aw9818_startup(void)
 
 static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-	static struct aw9818_priv *data = NULL;
+	struct aw9818_priv *data = NULL;
 
-	//check i2c-valid
+	//check i2c-func
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE | I2C_FUNC_I2C))
 		return -EIO;
 
@@ -1055,14 +1071,24 @@ static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2
 
 	return 0;
 
+	//TODO ...
       fail2:
       fail1:
 	return -1;
 }
 
+static void aw9818_led_uninit(void)
+{
+
+}
+
 static int aw9818_i2c_remove(struct i2c_client *client)
 {
-	//data auto-free by devm_kzalloc
+	//1.priv data auto-free by devm_kzalloc
+
+	//2.others
+	aw9818_led_uninit();
+
 	return 0;
 }
 
@@ -1092,13 +1118,14 @@ static __init int module_aw9818_init(void)
 {
 	struct i2c_adapter *adapter = NULL;
 	struct i2c_client *client = NULL;
-	int i;
-
+	int i = 0;
 	printk("Hello World\n");
+
 	adapter = i2c_get_adapter(AW9818_CHANNEL);
 	if (!adapter)
 		return -ENODEV;
-	for (i = 0; i < sizeof(aw9818_i2c_board_info) / sizeof(aw9818_i2c_board_info[0]); i++) {
+
+	for (; i < sizeof(aw9818_i2c_board_info) / sizeof(aw9818_i2c_board_info[0]); i++) {
 		client = NULL;
 		client = i2c_new_device(adapter, &aw9818_i2c_board_info[i]);
 		if (!client)
@@ -1111,8 +1138,8 @@ static __init int module_aw9818_init(void)
 
 static __exit void module_aw9818_exit(void)
 {
-	i2c_del_driver(&aw9818_i2c_driver);
 	printk("Byebye\n");
+	i2c_del_driver(&aw9818_i2c_driver);
 }
 
 //insmod xxx.ko
