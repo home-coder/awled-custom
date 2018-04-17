@@ -45,6 +45,8 @@
 
 #define AW9818_CHANNEL	2	//meaning use i2c-2, other i2c-0 i2c-1
 #define LED_CHIP_NUMS   2	//2 aw9818 chips
+#define AW_I2C_RETRIES  2	//i2c rw retry
+#define AW_I2C_RETRY_DELAY 5
 
 typedef enum {
 	LED_THREAD_ACTIVE = 0,
@@ -368,57 +370,23 @@ static int ledeffect_info_init(void)
 	return 0;
 }
 
-static int aw9818_read(u8 reg, u8 * rt_value, struct i2c_client *client)
+static int aw9818_i2c_write(unsigned char reg_addr, unsigned char reg_data, struct i2c_client *client)
 {
-	int ret;
-	u8 read_cmd[3] = { 0 };
-	u8 cmd_len = 0;
+	int ret = -1;
+	unsigned char cnt = 0;
 
-	read_cmd[0] = reg;
-	cmd_len = 1;
-
-	if (client->adapter == NULL)
-		pr_err("aw9818_read client->adapter==NULL\n");
-
-	ret = i2c_master_send(client, read_cmd, cmd_len);
-	if (ret != cmd_len) {
-		pr_err("aw9818_read error1\n");
-		return -1;
+	while (cnt < AW_I2C_RETRIES) {
+		ret = i2c_smbus_write_byte_data(client, reg_addr, reg_data);
+		if (ret < 0) {
+			pr_err("%s: i2c_write cnt=%d error=%d\n", __func__, cnt, ret);
+		} else {
+			break;
+		}
+		cnt++;
+		msleep(AW_I2C_RETRY_DELAY);
 	}
 
-	ret = i2c_master_recv(client, rt_value, 1);
-	if (ret != 1) {
-		pr_err("aw9818_read error2, ret = %d.\n", ret);
-		return -1;
-	}
-
-	return 0;
-}
-
-static void aw981x_read_register(CHIP_ID chip_id, byte reg, byte * data)
-{
-	AW9818_DEBUGP("aw981x_read_register\n");
-	pr_err("id 0x%x, reg 0x%x\n", chip_id, reg);
-
-	aw9818_read(reg, data, g_aw9818->i2c_cli[chip_id]);
-
-}
-
-static int aw9818_write(u8 reg, unsigned char value, struct i2c_client *client)
-{
-	int ret = 0;
-	u8 write_cmd[2] = { 0 };
-
-	write_cmd[0] = reg;
-	write_cmd[1] = value;
-
-	ret = i2c_master_send(client, write_cmd, 2);
-	if (ret != 2) {
-		pr_err("aw9818_write error->[REG-0x%02x,val-0x%02x]\n", reg, value);
-		return -1;
-	}
-
-	return 0;
+	return ret;
 }
 
 static void aw981x_write_register(CHIP_ID chip_id, byte reg, byte data)
@@ -426,7 +394,35 @@ static void aw981x_write_register(CHIP_ID chip_id, byte reg, byte data)
 	AW9818_DEBUGP("aw981x_write_register\n");
 	pr_err("id 0x%x, reg 0x%x, data 0x%x\n", chip_id, reg, data);
 
-	aw9818_write(reg, data, g_aw9818->i2c_cli[chip_id]);
+	aw9818_i2c_write(reg, data, g_aw9818->i2c_cli[chip_id]);
+}
+
+static int aw9818_i2c_read(unsigned char reg_addr, unsigned char *reg_data, struct i2c_client *client)
+{
+	int ret = -1;
+	unsigned char cnt = 0;
+
+	while (cnt < AW_I2C_RETRIES) {
+		ret = i2c_smbus_read_byte_data(client, reg_addr);
+		if (ret < 0) {
+			pr_err("%s: i2c_read cnt=%d error=%d\n", __func__, cnt, ret);
+		} else {
+			*reg_data = ret;
+			break;
+		}
+		cnt++;
+		msleep(AW_I2C_RETRY_DELAY);
+	}
+
+	return ret;
+}
+
+static void aw981x_read_register(CHIP_ID chip_id, byte reg, byte * data)
+{
+	AW9818_DEBUGP("aw981x_read_register\n");
+	pr_err("id 0x%x, reg 0x%x\n", chip_id, reg);
+
+	aw9818_i2c_read(reg, data, g_aw9818->i2c_cli[chip_id]);
 }
 
 static byte convert_data(byte brightness, LED_COLOR_LEVEL color)
