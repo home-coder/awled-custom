@@ -516,12 +516,12 @@ static void aw981x_enable_chip(void)
 
 static bool led_check_all_chipid(void)
 {
-	byte aw981x_id;
+	byte aw981x_id = 0;
 	bool re = false;
 	byte chip_id = 0;
 	AW9818_DEBUGP("led_check_chipid\n");
 
-	for (aw981x_id = 0; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
+	for (; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
 		aw981x_read_register(aw981x_id, aw981x_chipid_reg, &chip_id);
 		if (aw981x_chipid_value == chip_id) {
 			re = true;
@@ -535,10 +535,10 @@ static bool led_check_all_chipid(void)
 
 static void led_default_setup(void)
 {
-	byte aw981x_id;
+	byte aw981x_id = 0;
 	AW9818_DEBUGP("led_default_setup\n");
 
-	for (aw981x_id = 0; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
+	for (; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
 		// reset chip
 		aw981x_write_register(aw981x_id, aw981x_reset_reg, aw981x_reset_value);
 		// configure Imax and mode
@@ -841,26 +841,25 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 
 }
 
+/*
+ *
+ *一些全局变量的初始化等...
+ */
 static int aw9818_led_init(void)
 {
-	int ret = -1;
-	bool re = false;
-
 	AW9818_DEBUGP("aw9818_led_init...\n");
-	ret = ledif_info_init();
-	if (0 != ret) {
+
+	if (0 != ledif_info_init()) {
 		AW9818_DEBUGP("ledif_info_init failed\n");
 		return -1;
 	}
 
-	ret = ledeffect_info_init();
-	if (0 != ret) {
+	if (0 != ledeffect_info_init()) {
 		AW9818_DEBUGP("ledeffect_info_init failed\n");
 		return -1;
 	}
 
-	re = led_check_all_chipid();
-	if (!re) {
+	if (!led_check_all_chipid()) {
 		AW9818_DEBUGP("Maybe this is not aw9818 chip\n");
 		return -1;
 	}
@@ -917,7 +916,7 @@ static void do_ctrl_event(unsigned long cmd)
 					mdelay(50);
 				} else {
 					/*
-					 no matter "led_control_thread" is running or not, force break;
+					   no matter "led_control_thread" is running or not, force break;
 					 */
 					break;
 				}
@@ -1025,7 +1024,6 @@ static void aw9818_startup(void)
 static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	static struct aw9818_priv *data = NULL;
-	int ret = -1;
 
 	//check i2c-valid
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE | I2C_FUNC_I2C))
@@ -1042,13 +1040,11 @@ static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2
 
 	if (id->driver_data == 1) {	//all chips probe, then call function
 		data->i2c_cli[1] = client;
-		ret = aw9818_led_init();
-		if (0 != ret) {
+		if (0 != aw9818_led_init()) {
 			AW9818_DEBUGP("aw9818_led_init failed\n");
 			goto fail1;
 		}
-		ret = aw9818_setup_cdev(data);
-		if (0 != ret) {
+		if (0 != aw9818_setup_cdev(data)) {
 			AW9818_DEBUGP("aw9818_setup_cdev failed\n");
 			goto fail2;
 		}
