@@ -370,6 +370,7 @@ static int ledeffect_info_init(void)
 	return 0;
 }
 
+#ifdef I2C_SMBUS
 static int aw9818_i2c_write(unsigned char reg_addr, unsigned char reg_data, struct i2c_client *client)
 {
 	int ret = -1;
@@ -388,6 +389,26 @@ static int aw9818_i2c_write(unsigned char reg_addr, unsigned char reg_data, stru
 
 	return ret;
 }
+#else
+int aw9818_i2c_write(u8 reg, unsigned char value, struct i2c_client *client)
+{
+	int ret = 0;
+	u8 write_cmd[2] = {0};
+
+	write_cmd[0] = reg;
+	write_cmd[1] = value;
+
+	ret = i2c_master_send(client, write_cmd, 2);
+	if (ret != 2) {
+		pr_err("ac108_write error->[REG-0x%02x,val-0x%02x]\n",reg,value);
+		return -1;
+	}
+
+	return 0;
+}
+
+
+#endif
 
 static void aw981x_write_register(CHIP_ID chip_id, byte reg, byte data)
 {
@@ -397,6 +418,7 @@ static void aw981x_write_register(CHIP_ID chip_id, byte reg, byte data)
 	aw9818_i2c_write(reg, data, g_aw9818->i2c_cli[chip_id]);
 }
 
+#ifdef I2C_SMBUS
 static int aw9818_i2c_read(unsigned char reg_addr, unsigned char *reg_data, struct i2c_client *client)
 {
 	int ret = -1;
@@ -416,6 +438,35 @@ static int aw9818_i2c_read(unsigned char reg_addr, unsigned char *reg_data, stru
 
 	return ret;
 }
+#else
+static int aw9818_i2c_read(u8 reg, u8 *rt_value, struct i2c_client *client)
+{
+	int ret;
+	u8 read_cmd[3] = {0};
+	u8 cmd_len = 0;
+
+	read_cmd[0] = reg;
+	cmd_len = 1;
+
+	if (client->adapter == NULL)
+		pr_err("ac108_read client->adapter==NULL\n");
+
+	ret = i2c_master_send(client, read_cmd, cmd_len);
+	if (ret != cmd_len) {
+		pr_err("ac108_read error1\n");
+		return -1;
+	}
+
+	ret = i2c_master_recv(client, rt_value, 1);
+	if (ret != 1) {
+		pr_err("ac108_read error2, ret = %d.\n", ret);
+		return -1;
+	}
+
+	return 0;
+}
+
+#endif
 
 static void aw981x_read_register(CHIP_ID chip_id, byte reg, byte * data)
 {
@@ -1051,6 +1102,7 @@ static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2
 	//i2c client can get priv somewhere i2c_set_clientdata(client, data);
 
 	if (id->driver_data == 1) {	//all chips probe, then call function
+		AW9818_DEBUGP("all chips probe, then call function\n");
 		data->i2c_cli[1] = client;
 		if (0 != aw9818_led_init()) {
 			AW9818_DEBUGP("aw9818_led_init failed\n");
@@ -1062,6 +1114,7 @@ static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2
 		}
 		aw9818_startup();
 	} else if (id->driver_data == 0) {
+		AW9818_DEBUGP("id=0 chips probe\n");
 		data->i2c_cli[0] = client;
 	}
 

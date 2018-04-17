@@ -73,6 +73,8 @@ struct aw9818_priv {
 	dev_t devno;
 	struct class *class;
 	struct device *device;
+	struct mutex effect_lock;
+	struct semaphore condition_lock;
 	wait_queue_head_t notify_led_event;
 	struct task_struct *led_cntrl_threadid;
 	LED_THREAD_STATUS led_thread_running;
@@ -120,12 +122,20 @@ static void led_effect_complete(void)
 static void led_effect_airkiss_mode(void)
 {
 	printk("%s...\n", __func__);
+	while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
+		printk("%s...\n", __func__);
+		msleep(50);
+	}
 
 }
 
 static void led_effect_airkiss_config(void)
 {
 	printk("%s...\n", __func__);
+	while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
+		printk("%s...\n", __func__);
+		msleep(50);
+	}
 
 }
 
@@ -138,6 +148,11 @@ static void led_effect_airkiss_connect(void)
 static void led_effect_wake_up(byte orientation)
 {
 	printk("%s...\n", __func__);
+	//FIXME orientation assert
+	while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
+		printk("%s..., orientation--->%u\n", __func__, orientation);
+		msleep(50);
+	}
 
 }
 
@@ -175,12 +190,13 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 	while (true) {
 		p_led_effect = get_led_effect();
 		if (NULL != p_led_effect) {
+			//TODO check state
 			wait_event_interruptible(data->notify_led_event, g_aw9818->wait_condtion == true || kthread_should_stop());	//FIXME case is 1:interrup coming
+			down(&g_aw9818->condition_lock);
 			g_aw9818->wait_condtion = false;
 			g_aw9818->led_thread_sleep = false;
 			g_aw9818->led_thread_running = LED_THREAD_ACTIVE;
 
-			led_effect_close();
 			switch (p_led_effect->state) {
 				case AW9818_LEDS_EFFECT_STARTUP:
 					led_effect_startup();
@@ -230,12 +246,17 @@ static void led_event_cntrl_thread(struct aw9818_priv *data)
 			g_aw9818->led_thread_running = LED_THREAD_INACTIVE;
 
 			g_aw9818->led_thread_sleep = true;
+
+			up(&g_aw9818->condition_lock);
 		}
 	}
 }
 
 static void led_init(void)
 {
+	mutex_init(&g_aw9818->effect_lock); 
+	sema_init(&g_aw9818->condition_lock, 1);
+
 	init_waitqueue_head(&g_aw9818->notify_led_event);
 	g_aw9818->led_cntrl_threadid = kthread_run((int (*)(void *))led_event_cntrl_thread, g_aw9818, "led_control_thread");
 	if (IS_ERR(g_aw9818->led_cntrl_threadid)) {
@@ -256,9 +277,10 @@ static int aw9818_open(struct inode *inode, struct file *filp)
 static void do_ctrl_event(unsigned long cmd)
 {
 	ledeffect_info *p_led_effect = get_led_effect();
-	
+	int timeout = 4;
 	printk("%s...\n", __func__);
 	if (NULL != p_led_effect) {
+		mutex_lock(&g_aw9818->effect_lock);
 		p_led_effect->state = cmd;
 		//halt current thread
 		if (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
@@ -272,8 +294,15 @@ static void do_ctrl_event(unsigned long cmd)
 				mdelay(50);
 				wake_up(&g_aw9818->notify_led_event);
 				break;
+			} else {
+				if (timeout--) {
+					mdelay(50);
+				} else {
+					break;
+				}
 			}
 		}
+		mutex_unlock(&g_aw9818->effect_lock);
 	}
 
 }
@@ -286,8 +315,6 @@ static long aw9818_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned 
 
 		do_ctrl_event(cmd);
 	}
-
-	return 0;
 
 	return 0;
 }
