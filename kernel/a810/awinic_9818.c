@@ -39,6 +39,8 @@
 #define AW9818_DEBUGP(...)
 #endif
 
+#define I2C_SMBUS
+
 #define DEV_MAJOR   0		// meaning major is not set
 #define DEV_MINOR   0		//meaning set minor to be 0
 #define DEV_NAME    "xlj-aw9818"	//node "/dev/xlj-aw9818"
@@ -1086,7 +1088,8 @@ static void aw9818_startup(void)
 
 static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-	struct aw9818_priv *data = NULL;
+	//Singleton getInstance()
+	static struct aw9818_priv *data = NULL;
 
 	//check i2c-func
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE | I2C_FUNC_I2C))
