@@ -395,21 +395,19 @@ static int aw9818_i2c_write(unsigned char reg_addr, unsigned char reg_data, stru
 int aw9818_i2c_write(u8 reg, unsigned char value, struct i2c_client *client)
 {
 	int ret = 0;
-	u8 write_cmd[2] = {0};
+	u8 write_cmd[2] = { 0 };
 
 	write_cmd[0] = reg;
 	write_cmd[1] = value;
 
 	ret = i2c_master_send(client, write_cmd, 2);
 	if (ret != 2) {
-		pr_err("ac108_write error->[REG-0x%02x,val-0x%02x]\n",reg,value);
+		pr_err("ac108_write error->[REG-0x%02x,val-0x%02x]\n", reg, value);
 		return -1;
 	}
 
 	return 0;
 }
-
-
 #endif
 
 static void aw981x_write_register(CHIP_ID chip_id, byte reg, byte data)
@@ -417,7 +415,9 @@ static void aw981x_write_register(CHIP_ID chip_id, byte reg, byte data)
 	AW9818_DEBUGP("aw981x_write_register\n");
 	pr_err("id 0x%x, reg 0x%x, data 0x%x\n", chip_id, reg, data);
 
+#ifdef HAVE_CHIPS
 	aw9818_i2c_write(reg, data, g_aw9818->i2c_cli[chip_id]);
+#endif
 }
 
 #ifdef I2C_SMBUS
@@ -441,10 +441,10 @@ static int aw9818_i2c_read(unsigned char reg_addr, unsigned char *reg_data, stru
 	return ret;
 }
 #else
-static int aw9818_i2c_read(u8 reg, u8 *rt_value, struct i2c_client *client)
+static int aw9818_i2c_read(u8 reg, u8 * rt_value, struct i2c_client *client)
 {
 	int ret;
-	u8 read_cmd[3] = {0};
+	u8 read_cmd[3] = { 0 };
 	u8 cmd_len = 0;
 
 	read_cmd[0] = reg;
@@ -467,7 +467,6 @@ static int aw9818_i2c_read(u8 reg, u8 *rt_value, struct i2c_client *client)
 
 	return 0;
 }
-
 #endif
 
 static void aw981x_read_register(CHIP_ID chip_id, byte reg, byte * data)
@@ -475,7 +474,9 @@ static void aw981x_read_register(CHIP_ID chip_id, byte reg, byte * data)
 	AW9818_DEBUGP("aw981x_read_register\n");
 	pr_err("id 0x%x, reg 0x%x\n", chip_id, reg);
 
+#ifdef HAVE_CHIPS
 	aw9818_i2c_read(reg, data, g_aw9818->i2c_cli[chip_id]);
+#endif
 }
 
 static byte convert_data(byte brightness, LED_COLOR_LEVEL color)
@@ -567,6 +568,16 @@ static void aw981x_enable_chip(void)
 	}
 }
 
+static void aw981x_update_chip(void)
+{
+	byte aw981x_id = 0;
+	AW9818_DEBUGP("aw981x_update_chip\n");
+
+	for (; aw981x_id < LED_CHIP_NUMS; aw981x_id++) {
+		aw981x_write_register(aw981x_id, aw981x_update_reg, aw981x_update_value);
+	}
+}
+
 static bool led_check_all_chipid(void)
 {
 	byte aw981x_id = 0;
@@ -617,7 +628,7 @@ static void led_effect_close(void)
 
 	led_set_all_bright_color(bright_level, background);
 
-	aw981x_enable_chip();
+	aw981x_update_chip();
 }
 
 static void effect_comet_set(byte cur_idx, const ledcolor_info background, const ledcolor_info foward)
@@ -654,7 +665,7 @@ static void led_effect_startup(void)
 	while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
 		effect_comet_set(p_led_effect->cur_idx, background, foward);
 		//enable
-		aw981x_enable_chip();
+		aw981x_update_chip();
 		p_led_effect->cur_idx++;
 		msleep(500);
 	}
@@ -679,7 +690,7 @@ static void led_effect_complete(void)
 	while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
 		effect_comet_set(p_led_effect->cur_idx, background, foward);
 		//enable
-		aw981x_enable_chip();
+		aw981x_update_chip();
 		p_led_effect->cur_idx++;
 		msleep(500);
 	}
@@ -700,7 +711,7 @@ static void led_effect_airkiss_mode(void)
 	background = led_colors[orange];
 	led_set_all_bright_color(bright_level, background);
 
-	aw981x_enable_chip();
+	aw981x_update_chip();
 }
 
 /*
@@ -721,7 +732,7 @@ static void led_effect_airkiss_config(void)
 	while (g_aw9818->led_thread_running == LED_THREAD_ACTIVE) {
 		effect_comet_set(p_led_effect->cur_idx, background, foward);
 		//enable
-		aw981x_enable_chip();
+		aw981x_update_chip();
 		p_led_effect->cur_idx++;
 		msleep(500);
 	}
@@ -790,7 +801,7 @@ static void led_effect_command_success(void)
 
 		// light up leds
 		led_set_all_bright_color(brightness, color);
-		aw981x_enable_chip();
+		aw981x_update_chip();
 		msleep(50);
 
 		p_led_effect->cur_idx++;
@@ -942,6 +953,13 @@ static int aw9818_led_init(void)
 	}
 
 	return 0;
+}
+
+static void aw9818_led_uninit(void)
+{
+	AW9818_DEBUGP("aw9818_led_uninit...\n");
+	//TODO
+
 }
 
 static int aw9818_open(struct inode *inode, struct file *filp)
@@ -1123,23 +1141,21 @@ static int __devinit aw9818_i2c_probe(struct i2c_client *client, const struct i2
 
 	return 0;
 
-	//TODO ...
+	//TODO ... uninit()
       fail2:
       fail1:
 	return -1;
 }
 
-static void aw9818_led_uninit(void)
-{
-
-}
-
+//TODO 
 static int aw9818_i2c_remove(struct i2c_client *client)
 {
 	//1.priv data auto-free by devm_kzalloc
 
-	//2.others
+	//2.uninit
 	aw9818_led_uninit();
+
+	//3.dev delete
 
 	return 0;
 }
